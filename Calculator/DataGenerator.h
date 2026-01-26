@@ -1,22 +1,41 @@
 ﻿#pragma once
 #include "DataContainer.h"
-#include <corecrt_math_defines.h>
-#include <QPoint>
+#include <QPointF>
 #include <QHash>
+#include <qmath.h>
+
+namespace std {
+	template<>
+	struct hash<QPointF> {
+		constexpr inline size_t operator()(const QPointF& key, size_t seed = 0) const noexcept {
+			int x = static_cast<int>(key.x() * 100000000);
+			int y = static_cast<int>(key.y() * 100000000);
+			return qHashMulti(seed, x, y);
+		}
+	};
+}
 
 class TileRawData {
+	friend DataGenerator;
+public:
+	TileRawData(int index[], int ipos, int jpos) :texture_pos(ipos, jpos)
+	{
+		memcpy(point_index, index, 4 * sizeof(int));
+	}
 private:
 	int point_index[4];
+	QPoint texture_pos; // 瓦片在纹理中的像素坐标
 };
 
 class DataGenerator
 {
 public:
-	DataGenerator(DataContainer* container);
+	DataGenerator(DataContainer& container);
 	~DataGenerator();
 
 private:
-	DataContainer* container;
+	DataContainer& container;
+	int point_count = 0;
 	QHash<QPointF, int> index_map;
 	std::vector<QPointF> points;
 	std::vector<TileRawData> raw_data;
@@ -25,18 +44,21 @@ private:
 	// 参数表示的区域有且仅有部分地基在图片范围内，四个bool类型参数表示四个定点调用point_is_in_painting的返回值
 	void GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting);
 	inline bool point_is_in_painting(qreal theta, qreal phi);
-	inline constexpr bool float_equal(qreal lhs, qreal rhs);
+	inline bool float_equal(qreal lhs, qreal rhs);
 	inline qreal get_nearest_multiple(qreal value, qreal multiple_base); // multiple_base是倍数的基数
+	void get_latitudinal_zone_range(int min_y, int max_y, int& min_l, int& max_l);
 	qreal get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_polar_angle);
 	qreal get_minimal_azimuth_angle(qreal the_polar_angle);
+	// min/max_m/n是min/max_x/y对应的地基内瓦片的局部坐标，min_m/n可能大于max_m/n
 	void get_y_range(qreal min_polar_angle, qreal max_polar_angle, int& min_y, int& max_y, int& min_n, int& max_n);
-	void get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m);
-	void init_tile_zone(int min_y, int max_y, int min_n, int max_n, double min_azimuth_angle, double max_azimuth_angle);
-	void init_tile_stripe(int y, int min_n, int max_n, double min_azimuth_angle, double max_azimuth_angle);
+	void get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle);
+	void init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
+	void init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
+	int get_point_index(QPointF& point);
 
 	static constexpr int edge_segments = 8; // 每块地基划分为8*8=64块瓦片
 	static constexpr int planet_radius = 200; // 行星半径200m
-	static constexpr int latitudinal_zone_y[12] = { 0,80,130,155,180,195,210,220,230,235,240,245 }; // 纬度带最低纬度的y值
+	static constexpr int latitudinal_zone_y[13] = { 0,80,130,155,180,195,210,220,230,235,240,245,250 }; // 纬度带最低纬度的y值
 
 	static constexpr int precomputed_gcd_of_latitudinal_zone[78] = { 1000,200,200,100,100,100,100,20,20,20,20,20,
 																	 800,200,100,100,100,100,20,20,20,20,20,
