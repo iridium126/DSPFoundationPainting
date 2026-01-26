@@ -4,7 +4,7 @@
 
 int main(int argc, char* argv[])
 {
-	DataContainer container(0, 0, M_PI_2);
+	DataContainer container(M_PI/3, 0, M_PI/9*8);
 	DataGenerator generator(container);
 	QApplication app(argc, argv);
 	Calculator window;

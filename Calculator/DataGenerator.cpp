@@ -2,6 +2,8 @@
 
 DataGenerator::DataGenerator(DataContainer& container) :container(container)
 {
+	points.reserve(10000000);
+	raw_data.reserve(10000000);
 	GenerateData();
 }
 
@@ -235,6 +237,11 @@ inline bool DataGenerator::float_equal(qreal lhs, qreal rhs)
 	return abs(lhs - rhs) < 0.000000001;
 }
 
+inline int DataGenerator::float_floor(qreal value)
+{
+	return floor(value + 0.000000001);
+}
+
 inline qreal DataGenerator::get_nearest_multiple(qreal value, qreal multiple_base)
 {
 	return multiple_base * round(value / multiple_base);
@@ -266,12 +273,12 @@ void DataGenerator::get_latitudinal_zone_range(int min_y, int max_y, int& min_l,
 
 qreal DataGenerator::get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_polar_angle)
 {
-	int min_y = floor(min_polar_angle / M_PI * 500);
+	int min_y = float_floor(min_polar_angle / M_PI * 500);
 	qreal temp_max_y = max_polar_angle / M_PI * 500;
-	int max_y = floor(temp_max_y);
+	int max_y = float_floor(temp_max_y);
 	if (float_equal(temp_max_y, max_y))
 		max_y--;
-	else if (max_y < 250)
+	if (max_y < 250)
 	{
 		int temp = max_y;
 		max_y = 249 - min_y;
@@ -284,7 +291,7 @@ qreal DataGenerator::get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_
 
 qreal DataGenerator::get_minimal_azimuth_angle(qreal the_polar_angle)
 {
-	int y = floor(the_polar_angle / M_PI * 500);
+	int y = float_floor(the_polar_angle / M_PI * 500);
 	if (y < 250)
 		y = 249 - y;
 	else if (y == 500)
@@ -294,9 +301,9 @@ qreal DataGenerator::get_minimal_azimuth_angle(qreal the_polar_angle)
 
 void DataGenerator::get_y_range(qreal min_polar_angle, qreal max_polar_angle, int& min_y, int& max_y, int& min_n, int& max_n)
 {
-	min_y = floor(min_polar_angle / M_PI * 500);
+	min_y = float_floor(min_polar_angle / M_PI * 500);
 	qreal temp_max_y = max_polar_angle / M_PI * 500;
-	max_y = floor(temp_max_y);
+	max_y = float_floor(temp_max_y);
 	if (float_equal(temp_max_y, max_y))
 		max_y--;
 	min_n = round((min_polar_angle / M_PI * 500 - min_y) * edge_segments);
@@ -314,57 +321,63 @@ void DataGenerator::get_y_range(qreal min_polar_angle, qreal max_polar_angle, in
 		min_y = 249 - min_y;
 }
 
-void DataGenerator::get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle)
+void DataGenerator::get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle, int& latitude_length)
 {
-	minimal_azimuth_angle = 2 * M_PI / (reformOffsets[y + 1] - reformOffsets[y]);
-	min_x = floor(min_azimuth_angle / minimal_azimuth_angle);
+	latitude_length = reformOffsets[y + 1] - reformOffsets[y];
+	minimal_azimuth_angle = 2 * M_PI / (latitude_length);
+	min_x = float_floor(min_azimuth_angle / minimal_azimuth_angle);
 	qreal temp_max_x = max_azimuth_angle / minimal_azimuth_angle;
-	max_x = floor(temp_max_x);
+	max_x = float_floor(temp_max_x);
 	if (float_equal(temp_max_x, max_x))
 		max_x--;
 	min_m = round((min_azimuth_angle / minimal_azimuth_angle - min_x) * edge_segments);
 	max_m = round((temp_max_x - max_x) * edge_segments) - 1;
-	if (min_x >= 500)
+	if (min_x >= latitude_length / 2)
 	{
 		int temp = max_x;
-		max_x = 1499 - min_x;
-		min_x = 1499 - temp;
+		max_x = latitude_length * 1.5 - 1 - min_x;
+		min_x = latitude_length * 1.5 - 1 - temp;
 		temp = max_m;
 		max_m = min_m;
 		min_m = temp;
 	}
-	else if (max_x >= 500)
-		max_x = 1499 - max_x;
+	else if (max_x >= latitude_length / 2)
+		max_x = latitude_length * 1.5 - 1 - max_x;
 }
 
 void DataGenerator::init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
 {
 	int min_l, max_l;
 	get_latitudinal_zone_range(min_y, max_y, min_l, max_l);
-	if (min_y >= 250)
+	if (min_l != max_l)
 	{
-		init_latitudinal_zone(min_y, latitudinal_zone_y[min_l + 1] + 249, min_n, edge_segments - 1, min_azimuth_angle, max_azimuth_angle);
-		for (int l = min_l + 1; l < max_l; l++)
-			init_latitudinal_zone(latitudinal_zone_y[l] + 250, latitudinal_zone_y[l + 1] + 249, 0, edge_segments - 1, min_azimuth_angle, max_azimuth_angle);
-		init_latitudinal_zone(latitudinal_zone_y[max_l] + 250, max_y, 0, max_n, min_azimuth_angle, max_azimuth_angle);
+		if (min_y >= 250)
+		{
+			init_latitudinal_zone(min_y, latitudinal_zone_y[min_l + 1] + 249, min_n, edge_segments - 1, min_azimuth_angle, max_azimuth_angle);
+			for (int l = min_l + 1; l < max_l; l++)
+				init_latitudinal_zone(latitudinal_zone_y[l] + 250, latitudinal_zone_y[l + 1] + 249, 0, edge_segments - 1, min_azimuth_angle, max_azimuth_angle);
+			init_latitudinal_zone(latitudinal_zone_y[max_l] + 250, max_y, 0, max_n, min_azimuth_angle, max_azimuth_angle);
+		}
+		else if (max_y < 250)
+		{
+			init_latitudinal_zone(min_y, latitudinal_zone_y[min_l + 1] - 1, min_n, 0, min_azimuth_angle, max_azimuth_angle);
+			for (int l = min_l + 1; l < max_l; l++)
+				init_latitudinal_zone(latitudinal_zone_y[l], latitudinal_zone_y[l + 1] - 1, edge_segments - 1, 0, min_azimuth_angle, max_azimuth_angle);
+			init_latitudinal_zone(latitudinal_zone_y[max_l], max_y, edge_segments - 1, max_n, min_azimuth_angle, max_azimuth_angle);
+		}
 	}
-	else if (max_y < 250)
-	{
-		init_latitudinal_zone(min_y, latitudinal_zone_y[min_l + 1] - 1, min_n, 0, min_azimuth_angle, max_azimuth_angle);
-		for (int l = min_l + 1; l < max_l; l++)
-			init_latitudinal_zone(latitudinal_zone_y[l], latitudinal_zone_y[l + 1] - 1, edge_segments - 1, 0, min_azimuth_angle, max_azimuth_angle);
-		init_latitudinal_zone(latitudinal_zone_y[max_l], max_y, edge_segments - 1, max_n, min_azimuth_angle, max_azimuth_angle);
-	}
+	else
+		init_latitudinal_zone(min_y, max_y, min_n, max_n, min_azimuth_angle, max_azimuth_angle);
 }
 
 void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
 {
-	int min_x, max_x, min_m, max_m;
+	int min_x, max_x, min_m, max_m, latitude_length;
 	qreal minimal_azimuth_angle, minimal_polar_angle, min_polar_angle;
-	get_x_range(min_azimuth_angle, max_azimuth_angle, min_y, min_x, max_x, min_m, max_m, minimal_azimuth_angle);
+	get_x_range(min_azimuth_angle, max_azimuth_angle, min_y, min_x, max_x, min_m, max_m, minimal_azimuth_angle, latitude_length);
 	minimal_polar_angle = M_PI / 500 / edge_segments;
 	int dir_x, dir_y, x, y, m, n;
-	if (max_x < 500)
+	if (max_x < latitude_length / 2)
 	{
 		dir_x = 1;
 		x = min_x;
@@ -390,8 +403,8 @@ void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int m
 		n = min_n;
 		min_polar_angle = min_y * M_PI / 500;
 	}
-	int length_i = (max_y - min_y) * edge_segments + max_n - min_n + 1;
-	int length_j = (max_x - min_x) * edge_segments + max_m - min_m + 1;
+	int length_i = (max_y - min_y) * edge_segments + (max_n - min_n) * dir_y + 1;
+	int length_j = (max_x - min_x) * edge_segments + (max_m - min_m) * dir_x + 1;
 	int index[4], foundation_index;
 	for (int i = 1; i <= length_i; i++)
 	{
@@ -420,22 +433,21 @@ void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int m
 			{
 				if (j == 1)
 				{
-					index[0] = (*(raw_data.end() - length_i)).point_index[2];
-					index[1] = (*(raw_data.end() - length_i)).point_index[3];
+					index[0] = (*(raw_data.end() - length_j)).point_index[2];
+					index[1] = (*(raw_data.end() - length_j)).point_index[3];
 					QPointF point2(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle);
 					index[2] = get_point_index(point2);
 				}
 				else
 				{
 					index[0] = (*(raw_data.end() - 1)).point_index[1];
-					index[1] = (*(raw_data.end() - length_i)).point_index[3];
+					index[1] = (*(raw_data.end() - length_j)).point_index[3];
 					index[2] = (*(raw_data.end() - 1)).point_index[3];
 				}
 			}
 			QPointF point3(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle + minimal_azimuth_angle * j);
 			if (i < length_i && j < length_j)
 			{
-				index_map.insert(point3, point_count);
 				points.push_back(point3);
 				index[3] = point_count++;
 			}

@@ -45,13 +45,14 @@ private:
 	void GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting);
 	inline bool point_is_in_painting(qreal theta, qreal phi);
 	inline bool float_equal(qreal lhs, qreal rhs);
+	inline int float_floor(qreal value);
 	inline qreal get_nearest_multiple(qreal value, qreal multiple_base); // multiple_base是倍数的基数
 	void get_latitudinal_zone_range(int min_y, int max_y, int& min_l, int& max_l);
 	qreal get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_polar_angle);
 	qreal get_minimal_azimuth_angle(qreal the_polar_angle);
 	// min/max_m/n是min/max_x/y对应的地基内瓦片的局部坐标，min_m/n可能大于max_m/n
 	void get_y_range(qreal min_polar_angle, qreal max_polar_angle, int& min_y, int& max_y, int& min_n, int& max_n);
-	void get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle);
+	void get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle, int& latitude_length);
 	void init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
 	void init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
 	int get_point_index(QPointF& point);
