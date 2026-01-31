@@ -378,6 +378,7 @@ void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int m
 	qreal minimal_azimuth_angle, minimal_polar_angle, min_polar_angle;
 	get_x_range(min_azimuth_angle, max_azimuth_angle, min_y, min_x, max_x, min_m, max_m, minimal_azimuth_angle, latitude_length);
 	minimal_polar_angle = M_PI / 500 / edge_segments;
+	minimal_azimuth_angle /= edge_segments;
 	int dir_x, dir_y, x, y, m, n;
 	if (max_x < latitude_length / 2)
 	{

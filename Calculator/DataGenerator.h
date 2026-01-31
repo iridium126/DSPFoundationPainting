@@ -60,7 +60,6 @@ private:
 	QPointF spherical_to_screen_uv(const QPointF& point);
 
 	static constexpr int edge_segments = 8; // 每块地基划分为8*8=64块瓦片
-	static constexpr int planet_radius = 200; // 行星半径200m
 	static constexpr int latitudinal_zone_y[13] = { 0,80,130,155,180,195,210,220,230,235,240,245,250 }; // 纬度带最低纬度的y值
 
 	static constexpr int precomputed_gcd_of_latitudinal_zone[78] = { 1000,200,200,100,100,100,100,20,20,20,20,20,
