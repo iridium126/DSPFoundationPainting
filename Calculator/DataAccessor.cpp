@@ -8,11 +8,11 @@ DataAccessor::~DataAccessor()
 {
 }
 
-void DataAccessor::ProcessPicture(const QString& fileName)
+bool DataAccessor::ProcessPicture(const QString& fileName)
 {
 	QImage input(fileName);
 	if (input.isNull())
-		return;
+		return false;
 	int width = input.width();
 	int height = input.height();
 	int min_side = std::min(width, height);
@@ -28,4 +28,5 @@ void DataAccessor::ProcessPicture(const QString& fileName)
 		line_out[tile.texture_pos.y()] = line_in[static_cast<int>(offset_j + tile.uv.y() * min_side)];
 	}
 	output.save(fileName.left(fileName.lastIndexOf('.')) + "_texture.png");
+	return true;
 }

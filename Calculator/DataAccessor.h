@@ -7,7 +7,7 @@ class DataAccessor
 public:
 	DataAccessor(DataContainer& container);
 	~DataAccessor();
-	void ProcessPicture(const QString& fileName);
+	bool ProcessPicture(const QString& fileName);
 
 private:
 	DataContainer& container;
