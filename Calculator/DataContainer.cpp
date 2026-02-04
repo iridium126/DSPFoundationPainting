@@ -26,11 +26,13 @@ bool DataContainer::Load()
 	fin.read(reinterpret_cast<char*>(&loaded_painting_central_angle), sizeof(qreal));
 	if (loaded_polar_angle != polar_angle || loaded_azimuth_angle != azimuth_angle || loaded_painting_central_angle != painting_central_angle)
 		return false;
-	size_t data_size;
+	size_t data_size = 0;
 	fin.read(reinterpret_cast<char*>(&data_size), sizeof(size_t));
-	data.resize(data_size);
 	if (data_size > 0)
+	{
+		data.resize(data_size);
 		fin.read(reinterpret_cast<char*>(data.data()), sizeof(TileData) * data_size);
+	}
 	fin.close();
 	return true;
 }
