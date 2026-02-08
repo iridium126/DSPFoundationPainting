@@ -23,9 +23,9 @@ bool DataAccessor::ProcessPicture(const QString& fileName)
 	output.fill(Qt::transparent);
 	for (auto& tile : container.data)
 	{
-		const QRgb* line_in = reinterpret_cast<const QRgb*>(input.constScanLine(offset_i + tile.uv.x() * min_side));
+		const QRgb* line_in = reinterpret_cast<const QRgb*>(input.constScanLine(offset_i + tile.uv.y() * min_side));
 		QRgb* line_out = reinterpret_cast<QRgb*>(output.scanLine(tile.texture_pos.x()));
-		line_out[tile.texture_pos.y()] = line_in[static_cast<int>(offset_j + tile.uv.y() * min_side)];
+		line_out[tile.texture_pos.y()] = line_in[static_cast<int>(offset_j + (1 - tile.uv.x()) * min_side)];
 	}
 	output.save(fileName.left(fileName.lastIndexOf('.')) + "_texture.png");
 	return true;

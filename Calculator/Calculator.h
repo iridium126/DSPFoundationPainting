@@ -9,6 +9,8 @@
 #include <QSlider>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
+#include <QPushButton>
+#include <QFileDialog>
 
 class Calculator : public QMainWindow
 {
@@ -20,8 +22,10 @@ public:
 
 private:
 	Ui::CalculatorClass ui;
+	std::unique_ptr<DataContainer> container;
+	std::unique_ptr<DataAccessor> accessor;
 
-	void addDmsSlider(QVBoxLayout* mainLayout,
+	void addDmsSlider(QVBoxLayout* mainLayout, QSlider*& slider,
 		int minValue, int maxValue, int defaultValue,
 		const QString& regExpStr,
 		std::function<QString(int)> minuteToStr,

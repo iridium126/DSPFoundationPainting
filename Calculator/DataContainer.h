@@ -29,11 +29,9 @@ public:
 	~DataContainer();
 	bool Load();
 	void Save();
-
-private:
 	qreal polar_angle, azimuth_angle; // 极角、方位角
 	qreal painting_central_angle;     // 图片在球面上的边界的直径所对的圆心角
+private:
 	std::vector<TileData> data;
-
 	QByteArray get_file_name() const;
 };
