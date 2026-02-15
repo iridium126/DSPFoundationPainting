@@ -53,7 +53,7 @@ namespace DSPBasePainter
 		}
 		private IEnumerator Painting()
 		{
-			FileDialog.FileDialogConfig ofn = new FileDialog.FileDialogConfig();
+			FileDialog.OpenFileName ofn = new FileDialog.OpenFileName();
 			ofn.structSize = Marshal.SizeOf(ofn);
 			ofn.filter = "纹理文件(*.png)\0*.png\0"; // 只显示Calculator生成的纹理文件
 			ofn.filterIndex = 2;
@@ -64,7 +64,7 @@ namespace DSPBasePainter
 			ofn.initialDir = Application.dataPath;
 			ofn.title = "选择纹理文件";
 			ofn.defExt = "png";
-			ofn.flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000200 | 0x00000008; // OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_NOCHANGEDIR
+			ofn.flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000008; // OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR
 			ofn.dlgOwner = FileDialog.GetForegroundWindow(); // 设置对话框的父窗口为当前活动窗口
 			if (!FileDialog.GetOpenFileName(ofn))
 				yield break;
@@ -127,7 +127,7 @@ namespace DSPBasePainter
 	public static class FileDialog
 	{
 		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-		public class FileDialogConfig
+		public class OpenFileName
 		{
 			public int structSize = 0;
 			public IntPtr dlgOwner = IntPtr.Zero;
@@ -158,6 +158,6 @@ namespace DSPBasePainter
 		public static extern IntPtr GetForegroundWindow();
 
 		[DllImport("Comdlg32.dll", SetLastError = true, ThrowOnUnmappableChar = true, CharSet = CharSet.Auto)]
-		public static extern bool GetOpenFileName([In, Out] FileDialogConfig dialog);
+		public static extern bool GetOpenFileName([In, Out] OpenFileName ofn);
 	}
 }

@@ -93,7 +93,7 @@ Calculator::Calculator(QWidget* parent)
 	QSlider* degSlider;
 	const int MIN_DEG = 0;
 	const int MAX_DEG = 18000;
-	const int DEFAULT_DEG = 0;
+	const int DEFAULT_DEG = 12000;
 	const QString DEG_REG = R"(^([0-9]{1,3}(?:\.[0-9]{1,2})?)°$)";
 	addDmsSlider(vMainLayout, degSlider, MIN_DEG, MAX_DEG, DEFAULT_DEG, DEG_REG,
 		[](int value) {
