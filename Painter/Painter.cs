@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
@@ -33,7 +34,7 @@ namespace DSPBasePainter
 			var reform0RectTransform = GameObject.Find("UI Root/Overlay Canvas/In Game/Function Panel/Build Menu/reform-group/button-reform-0").GetComponent<RectTransform>();
 			var paintRectTransform = Instantiate<RectTransform>(reform0RectTransform, reform0RectTransform.parent);
 			Vector3 localPosition = reform0RectTransform.localPosition;
-			localPosition.x -= 370f;
+			localPosition.x -= 359f;
 			paintRectTransform.localPosition = localPosition;
 			AssetBundle iconBundle = AssetBundle.LoadFromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("DSPBasePainter.icon"));
 			Sprite icon = iconBundle.LoadAsset<Sprite>("icon");
@@ -68,14 +69,90 @@ namespace DSPBasePainter
 			ofn.dlgOwner = FileDialog.GetForegroundWindow(); // 设置对话框的父窗口为当前活动窗口
 			if (!FileDialog.GetOpenFileName(ofn))
 				yield break;
+			byte[] pngBytes = File.ReadAllBytes(ofn.file);
+			if (pngBytes == null || pngBytes.Length < 8)
+				yield break;
+			byte[] pngSignature = new byte[8];
+			Array.Copy(pngBytes, 0, pngSignature, 0, 8);
+			if (!pngSignature.SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
+				yield break;
+			// 遍历PNG块（从第8字节开始）
+			int position = 8;
+			byte[] chunkName = { (byte)'f', (byte)'m', (byte)'s', (byte)'k' };
+			byte[] chunkData = null;
+			while (position + 12 <= pngBytes.Length) // 块最小长度：4(长度)+4(块名)+0(数据)+4(CRC)=12
+			{
+				// 读取块数据长度（4字节，大端序）
+				byte[] lengthBytes = new byte[4];
+				Array.Copy(pngBytes, position, lengthBytes, 0, 4);
+				position += 4;
+				int chunkDataLength = BitConverter.ToInt32(lengthBytes.Reverse().ToArray(), 0);
+				// 读取块名（4字节）
+				byte[] currentChunkName = new byte[4];
+				Array.Copy(pngBytes, position, currentChunkName, 0, 4);
+				position += 4;
+				// 匹配目标块名
+				if (currentChunkName.SequenceEqual(chunkName))
+				{
+					// 读取块数据（跳过CRC）
+					chunkData = new byte[chunkDataLength];
+					Array.Copy(pngBytes, position, chunkData, 0, chunkDataLength);
+				}
+				else
+				{
+					// 跳过当前块的数据和CRC
+					position += chunkDataLength + 4;
+				}
+			}
+			if (chunkData == null || chunkData.Length != 40700)
+				yield break;
 			Texture2D paintingTex = new Texture2D(4096, 5088, TextureFormat.RGBA32, false);
-			bool load_success = paintingTex.LoadImage(File.ReadAllBytes(ofn.file));
-			//Debug.Log($"load_success:{load_success}");
+			if (!paintingTex.LoadImage(pngBytes))
+				yield break;
+			PlayerAction_Build actionBuild = GameMain.mainPlayer.controller.actionBuild;
+			BuildTool_BlueprintPaste buildTool_BlueprintPaste = actionBuild.blueprintPasteTool;
+			buildTool_BlueprintPaste.planet = actionBuild.planet;
+			buildTool_BlueprintPaste.factory = actionBuild.factory;
+			if (buildTool_BlueprintPaste.tmpPackage == null)
+				buildTool_BlueprintPaste.tmpPackage = new StorageComponent(GameMain.mainPlayer.package.size);
+			if (buildTool_BlueprintPaste.tmpPackage.size != GameMain.mainPlayer.package.size)
+				buildTool_BlueprintPaste.tmpPackage.SetSize(GameMain.mainPlayer.package.size);
+			Array.Copy(GameMain.mainPlayer.package.grids, buildTool_BlueprintPaste.tmpPackage.grids, buildTool_BlueprintPaste.tmpPackage.size);
+			buildTool_BlueprintPaste.tmpInhandId = GameMain.mainPlayer.inhandItemId;
+			buildTool_BlueprintPaste.tmpInhandCount = GameMain.mainPlayer.inhandItemCount;
+
+			buildTool_BlueprintPaste.latitudeCount = PlanetGrid.DetermineLongitudeSegmentCount(0, buildTool_BlueprintPaste.segment) * 5 / 2;
+			if (buildTool_BlueprintPaste.reformGridIds == null)
+				buildTool_BlueprintPaste.reformGridIds = new HashSet<int>();
+			if (buildTool_BlueprintPaste.tmpModLevel == null)
+				buildTool_BlueprintPaste.tmpModLevel = new Dictionary<int, int>();
+			// 解包地基掩码并生成reformGridIds
+			PlatformSystem platformSystem = GameMain.localPlanet.factory.platformSystem;
+			for (int byteIndex = 0, x = 0, y = 0; byteIndex < 40700; ++byteIndex)
+			{
+				int startIndex = byteIndex * 8;
+				int endIndex = startIndex + 8;
+				for (int index = startIndex; index < endIndex; ++index)
+					if ((chunkData[byteIndex] & (1 << (index - startIndex))) != 0)
+					{
+						while (y < 500)
+						{
+							x = index - platformSystem.reformOffsets[y];
+							if (0 <= x && x < platformSystem.reformOffsets[y + 1] - platformSystem.reformOffsets[y])
+								break;
+							y++;
+						}
+						buildTool_BlueprintPaste.reformGridIds.Add(x << 16 | y);
+					}
+			}
+			buildTool_BlueprintPaste.result = EBlueprintPasteResult.BuildingNeedReform | (EBlueprintPasteResult)8;
+			if (!buildTool_BlueprintPaste.DetermineReforms())
+				yield break;
+			Debug.Log("reformSuccess!");
 			Material reformMat0 = GameMain.localPlanet.reformMaterial0;
 			Material reformMat1 = GameMain.localPlanet.reformMaterial1;
 			reformMat0.shader = shaderPatch;
 			reformMat1.shader = shaderPatch;
-			PlatformSystem platformSystem = GameMain.localPlanet.factory.platformSystem;
 			ComputeBuffer reformOffsetsBuffer = platformSystem.reformOffsetsBuffer;
 			ComputeBuffer reformDataBuffer = platformSystem.reformDataBuffer;
 			if (platformSystem.reformData != null && reformDataBuffer != null)
@@ -92,6 +169,25 @@ namespace DSPBasePainter
 
 			yield return null;
 		}
+		[HarmonyTranspiler, HarmonyPatch(typeof(BuildTool_BlueprintPaste), "DetermineReforms")]
+		private static IEnumerable<CodeInstruction> DetermineReforms_Patch(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+		{
+			CodeMatcher codeMatcher = new CodeMatcher(instructions, generator)
+				.MatchForward(false,
+					new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(BuildTool_BlueprintPaste), "GetLatAndLngRadByGridId")))
+				.Advance(15);
+			return codeMatcher
+				.CreateLabelAt(codeMatcher.Pos + 1, out Label label)
+				.Insert(
+					new CodeInstruction(OpCodes.Brtrue_S, label),
+					new CodeInstruction(OpCodes.Ldarg_0),
+					new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(BuildTool_BlueprintPaste), "result")),
+					new CodeInstruction(OpCodes.Ldc_I4_8),
+					new CodeInstruction(OpCodes.And),
+					new CodeInstruction(OpCodes.Ldc_I4_0),
+					new CodeInstruction(OpCodes.Cgt))
+				.InstructionEnumeration();
+		}
 		public static void PaintButtonSetActive(bool value)
 		{
 			paintButton.gameObject.SetActive(value);
@@ -107,6 +203,7 @@ namespace DSPBasePainter
 					new CodeMatch(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(Component), "gameObject")),
 					new CodeMatch(OpCodes.Call, AccessTools.PropertyGetter(typeof(GameMain), "sandboxToolsEnabled")),
 					new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(GameObject), "SetActive")))
+				.Advance(1)
 				.InsertAndAdvance(
 					new CodeInstruction(OpCodes.Ldc_I4_1),
 					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Painter), "PaintButtonSetActive")))
@@ -116,7 +213,8 @@ namespace DSPBasePainter
 					new CodeMatch(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(Component), "gameObject")),
 					new CodeMatch(OpCodes.Ldc_I4_0),
 					new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(GameObject), "SetActive")))
-				.InsertAndAdvance(
+				.Advance(1)
+				.Insert(
 					new CodeInstruction(OpCodes.Ldc_I4_0),
 					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Painter), "PaintButtonSetActive")))
 				.InstructionEnumeration();
