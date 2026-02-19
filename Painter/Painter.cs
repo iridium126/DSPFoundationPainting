@@ -34,7 +34,7 @@ namespace DSPBasePainter
 			var reform0RectTransform = GameObject.Find("UI Root/Overlay Canvas/In Game/Function Panel/Build Menu/reform-group/button-reform-0").GetComponent<RectTransform>();
 			var paintRectTransform = Instantiate<RectTransform>(reform0RectTransform, reform0RectTransform.parent);
 			Vector3 localPosition = reform0RectTransform.localPosition;
-			localPosition.x -= 359f;
+			localPosition.x -= 358f;
 			paintRectTransform.localPosition = localPosition;
 			AssetBundle iconBundle = AssetBundle.LoadFromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("DSPBasePainter.icon"));
 			Sprite icon = iconBundle.LoadAsset<Sprite>("icon");
@@ -77,7 +77,7 @@ namespace DSPBasePainter
 			if (!pngSignature.SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
 				yield break;
 			// 遍历PNG块（从第8字节开始）
-			int position = 8;
+			long position = 8;
 			byte[] chunkName = { (byte)'f', (byte)'m', (byte)'s', (byte)'k' };
 			byte[] chunkData = null;
 			while (position + 12 <= pngBytes.Length) // 块最小长度：4(长度)+4(块名)+0(数据)+4(CRC)=12
@@ -86,7 +86,7 @@ namespace DSPBasePainter
 				byte[] lengthBytes = new byte[4];
 				Array.Copy(pngBytes, position, lengthBytes, 0, 4);
 				position += 4;
-				int chunkDataLength = BitConverter.ToInt32(lengthBytes.Reverse().ToArray(), 0);
+				uint chunkDataLength = (uint)((lengthBytes[0] << 24) | (lengthBytes[1] << 16) | (lengthBytes[2] << 8) | lengthBytes[3]);
 				// 读取块名（4字节）
 				byte[] currentChunkName = new byte[4];
 				Array.Copy(pngBytes, position, currentChunkName, 0, 4);
@@ -97,18 +97,17 @@ namespace DSPBasePainter
 					// 读取块数据（跳过CRC）
 					chunkData = new byte[chunkDataLength];
 					Array.Copy(pngBytes, position, chunkData, 0, chunkDataLength);
+					break;
 				}
-				else
-				{
-					// 跳过当前块的数据和CRC
+				else // 跳过当前块的数据和CRC
 					position += chunkDataLength + 4;
-				}
 			}
 			if (chunkData == null || chunkData.Length != 40700)
 				yield break;
 			Texture2D paintingTex = new Texture2D(4096, 5088, TextureFormat.RGBA32, false);
 			if (!paintingTex.LoadImage(pngBytes))
 				yield break;
+			yield return null;
 			PlayerAction_Build actionBuild = GameMain.mainPlayer.controller.actionBuild;
 			BuildTool_BlueprintPaste buildTool_BlueprintPaste = actionBuild.blueprintPasteTool;
 			buildTool_BlueprintPaste.planet = actionBuild.planet;
@@ -145,36 +144,43 @@ namespace DSPBasePainter
 						buildTool_BlueprintPaste.reformGridIds.Add(x << 16 | y);
 					}
 			}
+			BuildTool_Reform buildTool_Reform = actionBuild.reformTool;
+			buildTool_Reform.brushType = 7;
+			buildTool_Reform.buryVeins = true;
 			buildTool_BlueprintPaste.result = EBlueprintPasteResult.BuildingNeedReform | (EBlueprintPasteResult)8;
 			if (!buildTool_BlueprintPaste.DetermineReforms())
 				yield break;
-			Debug.Log("reformSuccess!");
+			yield return null;
 			Material reformMat0 = GameMain.localPlanet.reformMaterial0;
 			Material reformMat1 = GameMain.localPlanet.reformMaterial1;
-			reformMat0.shader = shaderPatch;
-			reformMat1.shader = shaderPatch;
-			ComputeBuffer reformOffsetsBuffer = platformSystem.reformOffsetsBuffer;
-			ComputeBuffer reformDataBuffer = platformSystem.reformDataBuffer;
-			if (platformSystem.reformData != null && reformDataBuffer != null)
+			if (reformMat0.shader != shaderPatch || reformMat1.shader != shaderPatch)
 			{
-				reformOffsetsBuffer.SetData(platformSystem.reformOffsets);
-				reformDataBuffer.SetData(platformSystem.reformData);
-				reformMat0.SetBuffer("_OffsetsBuffer", reformOffsetsBuffer);
-				reformMat0.SetBuffer("_DataBuffer", reformDataBuffer);
-				reformMat1.SetBuffer("_OffsetsBuffer", reformOffsetsBuffer);
-				reformMat1.SetBuffer("_DataBuffer", reformDataBuffer);
+				reformMat0.shader = shaderPatch;
+				reformMat1.shader = shaderPatch;
+				ComputeBuffer reformOffsetsBuffer = platformSystem.reformOffsetsBuffer;
+				ComputeBuffer reformDataBuffer = platformSystem.reformDataBuffer;
+				if (platformSystem.reformData != null && reformDataBuffer != null)
+				{
+					reformOffsetsBuffer.SetData(platformSystem.reformOffsets);
+					reformDataBuffer.SetData(platformSystem.reformData);
+					reformMat0.SetBuffer("_OffsetsBuffer", reformOffsetsBuffer);
+					reformMat0.SetBuffer("_DataBuffer", reformDataBuffer);
+					reformMat1.SetBuffer("_OffsetsBuffer", reformOffsetsBuffer);
+					reformMat1.SetBuffer("_DataBuffer", reformDataBuffer);
+				}
 			}
 			reformMat0.SetTexture("_PaintingTexture", paintingTex);
 			reformMat1.SetTexture("_PaintingTexture", paintingTex);
-
-			yield return null;
 		}
 		[HarmonyTranspiler, HarmonyPatch(typeof(BuildTool_BlueprintPaste), "DetermineReforms")]
 		private static IEnumerable<CodeInstruction> DetermineReforms_Patch(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
 		{
 			CodeMatcher codeMatcher = new CodeMatcher(instructions, generator)
 				.MatchForward(false,
-					new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(BuildTool_BlueprintPaste), "GetLatAndLngRadByGridId")))
+					new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(BuildTool_BlueprintPaste), "GetLatAndLngRadByGridId")),
+					new CodeMatch(OpCodes.Ldarg_0),
+					new CodeMatch(OpCodes.Ldfld, AccessTools.Field(typeof(BuildTool_BlueprintPaste), "testModLevel")),
+					new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(Dictionary<int, int>), "Clear")))
 				.Advance(15);
 			return codeMatcher
 				.CreateLabelAt(codeMatcher.Pos + 1, out Label label)

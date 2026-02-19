@@ -28,7 +28,9 @@ bool DataAccessor::ProcessPicture(const QString& fileName)
 	{
 		const QRgb* line_in = reinterpret_cast<const QRgb*>(input.constScanLine(offset_i + tile.uv.y() * min_side));
 		QRgb* line_out = reinterpret_cast<QRgb*>(output.scanLine(tile.texture_pos.x()));
-		line_out[tile.texture_pos.y()] = line_in[static_cast<int>(offset_j + (1 - tile.uv.x()) * min_side)];
+		QRgb pixel = line_in[static_cast<int>(offset_j + (1 - tile.uv.x()) * min_side)];
+		// 将ARGB32格式转换为RGBA8888格式（交换R和B通道）
+		line_out[tile.texture_pos.y()] = pixel & 0xFF00FF00 | ((pixel & 0x00FF0000) >> 16) | ((pixel & 0x000000FF) << 16);
 	}
 	generate_foundation_mask(output.bits(), 0, 5088 / 8);
 	write_texture(fileName.left(fileName.lastIndexOf('.')) + "_texture.png", output);
@@ -37,7 +39,7 @@ bool DataAccessor::ProcessPicture(const QString& fileName)
 
 void DataAccessor::generate_foundation_mask(const uchar* bits, int startFNDRow, int endFNDRow)
 {
-	// RGBA8888格式：每个像素4字节，字节顺序（小端）：B(0), G(1), R(2), A(3)
+	// RGBA8888格式：每个像素4字节，字节顺序（小端）：R(0), G(1), B(2), A(3)
 	const int pixel_bytes = 4;
 	const int alpha_offset = 3; // alpha通道在像素字节的第4位（索引3）
 	const int foundation_size = 8;
