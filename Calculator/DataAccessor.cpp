@@ -33,8 +33,7 @@ bool DataAccessor::ProcessPicture(const QString& fileName)
 		line_out[tile.texture_pos.y()] = pixel & 0xFF00FF00 | ((pixel & 0x00FF0000) >> 16) | ((pixel & 0x000000FF) << 16);
 	}
 	generate_foundation_mask(output.bits(), 0, 5088 / 8);
-	write_texture(fileName.left(fileName.lastIndexOf('.')) + "_texture.png", output);
-	return true;
+	return write_texture(fileName.left(fileName.lastIndexOf('.')) + "_texture.png", output);
 }
 
 void DataAccessor::generate_foundation_mask(const uchar* bits, int startFNDRow, int endFNDRow)
@@ -86,7 +85,7 @@ bool DataAccessor::write_texture(const QString& filePath, const QImage& image)
 {
 	auto byte_data = pack_bools_to_bytes();
 	FILE* fp = nullptr;
-	if (fopen_s(&fp, filePath.toUtf8().constData(), "wb") != 0)
+	if (_wfopen_s(&fp, filePath.toStdWString().c_str(), L"wb") != 0)
 		return false;
 	// 初始化libpng结构
 	png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);

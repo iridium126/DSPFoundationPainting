@@ -397,14 +397,14 @@ void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int m
 		dir_y = -1;
 		y = max_y;
 		n = max_n;
-		min_polar_angle = (249 - max_y) * M_PI / 500;
+		min_polar_angle = (249 - max_y + max_n / static_cast<qreal>(edge_segments)) * M_PI / 500;
 	}
 	else
 	{
 		dir_y = 1;
 		y = min_y;
 		n = min_n;
-		min_polar_angle = min_y * M_PI / 500;
+		min_polar_angle = (min_y + min_n / static_cast<qreal>(edge_segments)) * M_PI / 500;
 	}
 	int length_i = (max_y - min_y) * edge_segments + (max_n - min_n) * dir_y + 1;
 	int length_j = (max_x - min_x) * edge_segments + (max_m - min_m) * dir_x + 1;
