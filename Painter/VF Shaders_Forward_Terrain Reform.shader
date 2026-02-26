@@ -55,6 +55,8 @@ Shader "VF Shaders/Forward/Terrain Reform"
 			#pragma multi_compile _ SHADOWS_SCREEN
 			#pragma multi_compile _ VERTEXLIGHT_ON*/
 			#define DIRECTIONAL
+			#define LIGHTPROBE_SH
+			#define SHADOWS_SCREEN
 
 
 			#ifdef DIRECTIONAL
@@ -4501,6 +4503,8 @@ Shader "VF Shaders/Forward/Terrain Reform"
 			SamplerState sampler_Global_PGI;
 			TextureCube<float4> unity_ProbeVolumeSH;
 			SamplerState samplerunity_ProbeVolumeSH;
+			Texture2D<float4> _PaintingTexture;
+			SamplerState sampler_PaintingTexture;
 
 			static float4 fragment_input_1;
 			static float4 fragment_input_2;
@@ -4635,9 +4639,8 @@ Shader "VF Shaders/Forward/Terrain Reform"
 				float fragment_unnamed_259 = asfloat(fragment_unnamed_252 ? asuint(ceil(fragment_unnamed_250)) : asuint(floor(fragment_unnamed_250)));
 				float fragment_unnamed_263 = float(fragment_unnamed_164);
 				uint fragment_unnamed_271 = uint(asfloat((0.0f < fragment_unnamed_259) ? asuint(fragment_unnamed_259 + (-0.89999997615814208984375f)) : asuint((((-0.0f) - fragment_unnamed_259) + fragment_unnamed_263) + (-0.89999997615814208984375f))));
-				uint4 fragment_unnamed_273 = _OffsetsBuffer.Load(fragment_unnamed_271);
-				uint fragment_unnamed_274 = fragment_unnamed_273.x;
-				float fragment_unnamed_281 = float((-fragment_unnamed_274) + _OffsetsBuffer.Load(fragment_unnamed_271 + 1u).x);
+				int fragment_unnamed_274 = _OffsetsBuffer.Load(fragment_unnamed_271);
+				float fragment_unnamed_281 = float((-fragment_unnamed_274) + _OffsetsBuffer.Load(fragment_unnamed_271 + 1u));
 				float fragment_unnamed_282 = mad(((((fragment_unnamed_235 >= ((-0.0f) - fragment_unnamed_235)) ? 4294967295u : 0u) & ((fragment_unnamed_233 < ((-0.0f) - fragment_unnamed_233)) ? 4294967295u : 0u)) != 0u) ? ((-0.0f) - fragment_unnamed_231) : fragment_unnamed_231, 0.15915493667125701904296875f, 0.5f);
 				float fragment_unnamed_284 = fragment_unnamed_281 * fragment_unnamed_282;
 				bool fragment_unnamed_285 = 0.0f < fragment_unnamed_284;
@@ -4645,16 +4648,19 @@ Shader "VF Shaders/Forward/Terrain Reform"
 				float fragment_unnamed_292 = mad(fragment_unnamed_281, 0.5f, 0.5f);
 				float fragment_unnamed_308 = float(fragment_unnamed_274 + uint(asfloat((fragment_unnamed_292 < fragment_unnamed_291) ? asuint(mad((-0.0f) - fragment_unnamed_281, 0.5f, fragment_unnamed_291) + (-1.0f)) : asuint(fragment_unnamed_281 + ((-0.0f) - fragment_unnamed_291))) + 0.100000001490116119384765625f)) * 0.25f;
 				float fragment_unnamed_311 = frac(fragment_unnamed_308);
-				uint4 fragment_unnamed_313 = _DataBuffer.Load(uint(floor(fragment_unnamed_308)));
-				uint fragment_unnamed_314 = fragment_unnamed_313.x;
+				uint fragment_unnamed_314 = _DataBuffer.Load(uint(floor(fragment_unnamed_308)));
 				uint fragment_unnamed_326 = 16u & 31u;
 				uint fragment_unnamed_333 = 8u & 31u;
 				uint fragment_unnamed_341 = (0.625f < fragment_unnamed_311) ? (fragment_unnamed_314 >> 24u) : ((0.375f < fragment_unnamed_311) ? spvBitfieldUExtract(fragment_unnamed_314, fragment_unnamed_326, min((8u & 31u), (32u - fragment_unnamed_326))) : ((0.125f < fragment_unnamed_311) ? spvBitfieldUExtract(fragment_unnamed_314, fragment_unnamed_333, min((8u & 31u), (32u - fragment_unnamed_333))) : (fragment_unnamed_314 & 255u)));
-				float fragment_unnamed_343 = float(fragment_unnamed_341 >> 5u);
-				float fragment_unnamed_348 = asfloat((6.5f < fragment_unnamed_343) ? 0u : asuint(fragment_unnamed_343));
+				float fragment_unnamed_348 = float(fragment_unnamed_341 >> 5u);
 				float fragment_unnamed_355 = round(fragment_uniform_buffer_0[11u].y * 3.0f);
 				discard_cond(fragment_unnamed_348 < (fragment_unnamed_355 + 0.00999999977648258209228515625f));
-				discard_cond((fragment_unnamed_355 + 3.9900000095367431640625f) < fragment_unnamed_348);
+				uint reform_index = fragment_unnamed_308 * 4;
+				bool is_reform_transparent = (fragment_unnamed_355 + 3.9900000095367431640625f) < fragment_unnamed_348;
+				uint n_index = frac(fragment_uniform_buffer_0[14u].x / 2 - fragment_unnamed_250) * 8;
+				uint m_index = frac(fragment_unnamed_284) * 8;
+				float4 fragment_unnamed_861 = is_reform_transparent ? _PaintingTexture.Sample(sampler_ColorsTexture, float2((reform_index % 512 * 8 + m_index + 0.5f) / 4096.0f, 1 - (reform_index / 512 * 8 + n_index + 0.5f) / 5088.0f)) : _ColorsTexture.Sample(sampler_ColorsTexture, float2((float(fragment_unnamed_341 & 31u) + 0.5f) * 0.03125f, asfloat(1056964608u)));
+				discard_cond(is_reform_transparent && fragment_unnamed_861.w < 0.0001);
 				float fragment_unnamed_374 = mad(fragment_unnamed_249, 0.3183098733425140380859375f, 0.5f);
 				float fragment_unnamed_375 = mad(fragment_unnamed_249, 0.3183098733425140380859375f, -0.5f);
 				float fragment_unnamed_386 = asfloat(fragment_unnamed_252 ? asuint(ceil(fragment_unnamed_374)) : asuint(floor(fragment_unnamed_374)));
@@ -4662,18 +4668,16 @@ Shader "VF Shaders/Forward/Terrain Reform"
 				uint fragment_unnamed_390 = uint(ceil(max(abs(fragment_unnamed_250) + (-0.5f), 0.0f)) + (-0.89999997615814208984375f));
 				uint fragment_unnamed_409 = uint(asfloat((0.0f < fragment_unnamed_386) ? asuint(fragment_unnamed_386 + (-0.89999997615814208984375f)) : asuint((fragment_unnamed_263 + ((-0.0f) - fragment_unnamed_386)) + (-0.89999997615814208984375f))));
 				uint fragment_unnamed_410 = uint(asfloat((0.0f < fragment_unnamed_388) ? asuint(fragment_unnamed_388 + (-0.89999997615814208984375f)) : asuint((fragment_unnamed_263 + ((-0.0f) - fragment_unnamed_388)) + (-0.89999997615814208984375f))));
-				uint4 fragment_unnamed_411 = _OffsetsBuffer.Load(fragment_unnamed_409);
-				uint fragment_unnamed_412 = fragment_unnamed_411.x;
-				uint4 fragment_unnamed_413 = _OffsetsBuffer.Load(fragment_unnamed_410);
-				uint fragment_unnamed_414 = fragment_unnamed_413.x;
+				int fragment_unnamed_412 = _OffsetsBuffer.Load(fragment_unnamed_409);
+				int fragment_unnamed_414 = _OffsetsBuffer.Load(fragment_unnamed_410);
 				uint fragment_unnamed_425 = (fragment_unnamed_271 != 0u) ? 4294967295u : 0u;
 				uint fragment_unnamed_428 = (fragment_unnamed_271 != (fragment_unnamed_164 + 4294967295u)) ? 4294967295u : 0u;
 				uint fragment_unnamed_431 = (fragment_unnamed_164 != fragment_unnamed_271) ? 4294967295u : 0u;
 				uint fragment_unnamed_435 = (fragment_unnamed_271 != (uint(fragment_uniform_buffer_0[14u].x + 0.100000001490116119384765625f) + 4294967295u)) ? 4294967295u : 0u;
 				bool fragment_unnamed_451 = (fragment_unnamed_435 & (fragment_unnamed_431 & (fragment_unnamed_425 & fragment_unnamed_428))) != 0u;
 				uint fragment_unnamed_454 = asuint(fragment_unnamed_281);
-				uint fragment_unnamed_455 = fragment_unnamed_451 ? asuint(float((-fragment_unnamed_412) + _OffsetsBuffer.Load(fragment_unnamed_409 + 1u).x)) : fragment_unnamed_454;
-				float fragment_unnamed_457 = asfloat(fragment_unnamed_451 ? asuint(float((-fragment_unnamed_414) + _OffsetsBuffer.Load(fragment_unnamed_410 + 1u).x)) : fragment_unnamed_454);
+				uint fragment_unnamed_455 = fragment_unnamed_451 ? asuint(float((-fragment_unnamed_412) + _OffsetsBuffer.Load(fragment_unnamed_409 + 1u))) : fragment_unnamed_454;
+				float fragment_unnamed_457 = asfloat(fragment_unnamed_451 ? asuint(float((-fragment_unnamed_414) + _OffsetsBuffer.Load(fragment_unnamed_410 + 1u))) : fragment_unnamed_454);
 				float fragment_unnamed_460 = fragment_unnamed_282 * asfloat(fragment_unnamed_455);
 				float fragment_unnamed_461 = fragment_unnamed_282 * fragment_unnamed_457;
 				float fragment_unnamed_462 = mad(fragment_unnamed_282, fragment_unnamed_281, 0.5f);
@@ -4692,26 +4696,22 @@ Shader "VF Shaders/Forward/Terrain Reform"
 				float fragment_unnamed_515 = min(fragment_unnamed_501 * 40.0f, 1.0f);
 				float fragment_unnamed_574 = float(fragment_unnamed_412 + uint(asfloat((mad(asfloat(fragment_unnamed_455), 0.5f, 0.5f) < fragment_unnamed_486) ? asuint(mad((-0.0f) - asfloat(fragment_unnamed_455), 0.5f, fragment_unnamed_486) + (-1.0f)) : asuint(asfloat(fragment_unnamed_455) + ((-0.0f) - fragment_unnamed_486))) + 0.100000001490116119384765625f)) * 0.25f;
 				float fragment_unnamed_576 = frac(fragment_unnamed_574);
-				uint4 fragment_unnamed_578 = _DataBuffer.Load(uint(floor(fragment_unnamed_574)));
-				uint fragment_unnamed_579 = fragment_unnamed_578.x;
+				uint fragment_unnamed_579 = _DataBuffer.Load(uint(floor(fragment_unnamed_574)));
 				uint fragment_unnamed_585 = 16u & 31u;
 				uint fragment_unnamed_590 = 8u & 31u;
 				float fragment_unnamed_600 = float(uint(asfloat((mad(fragment_unnamed_457, 0.5f, 0.5f) < fragment_unnamed_488) ? asuint(mad((-0.0f) - fragment_unnamed_457, 0.5f, fragment_unnamed_488) + (-1.0f)) : asuint(fragment_unnamed_457 + ((-0.0f) - fragment_unnamed_488))) + 0.100000001490116119384765625f) + fragment_unnamed_414) * 0.25f;
 				float fragment_unnamed_602 = frac(fragment_unnamed_600);
-				uint4 fragment_unnamed_604 = _DataBuffer.Load(uint(floor(fragment_unnamed_600)));
-				uint fragment_unnamed_605 = fragment_unnamed_604.x;
+				uint fragment_unnamed_605 = _DataBuffer.Load(uint(floor(fragment_unnamed_600)));
 				uint fragment_unnamed_611 = 16u & 31u;
 				uint fragment_unnamed_616 = 8u & 31u;
 				float fragment_unnamed_626 = float(uint(asfloat((fragment_unnamed_292 < fragment_unnamed_494) ? asuint(mad((-0.0f) - fragment_unnamed_281, 0.5f, fragment_unnamed_494) + (-1.0f)) : asuint(((-0.0f) - fragment_unnamed_494) + fragment_unnamed_281)) + 0.100000001490116119384765625f) + fragment_unnamed_274) * 0.25f;
 				float fragment_unnamed_628 = frac(fragment_unnamed_626);
-				uint4 fragment_unnamed_630 = _DataBuffer.Load(uint(floor(fragment_unnamed_626)));
-				uint fragment_unnamed_631 = fragment_unnamed_630.x;
+				uint fragment_unnamed_631 = _DataBuffer.Load(uint(floor(fragment_unnamed_626)));
 				uint fragment_unnamed_637 = 16u & 31u;
 				uint fragment_unnamed_642 = 8u & 31u;
 				float fragment_unnamed_652 = float(uint(asfloat((fragment_unnamed_292 < fragment_unnamed_500) ? asuint(mad((-0.0f) - fragment_unnamed_281, 0.5f, fragment_unnamed_500) + (-1.0f)) : asuint(fragment_unnamed_281 + ((-0.0f) - fragment_unnamed_500))) + 0.100000001490116119384765625f) + fragment_unnamed_274) * 0.25f;
 				float fragment_unnamed_654 = frac(fragment_unnamed_652);
-				uint4 fragment_unnamed_656 = _DataBuffer.Load(uint(floor(fragment_unnamed_652)));
-				uint fragment_unnamed_657 = fragment_unnamed_656.x;
+				uint fragment_unnamed_657 = _DataBuffer.Load(uint(floor(fragment_unnamed_652)));
 				uint fragment_unnamed_663 = 16u & 31u;
 				uint fragment_unnamed_668 = 8u & 31u;
 				float fragment_unnamed_678 = float(((0.625f < fragment_unnamed_602) ? (fragment_unnamed_605 >> 24u) : ((0.375f < fragment_unnamed_602) ? spvBitfieldUExtract(fragment_unnamed_605, fragment_unnamed_611, min((8u & 31u), (32u - fragment_unnamed_611))) : ((0.125f < fragment_unnamed_602) ? spvBitfieldUExtract(fragment_unnamed_605, fragment_unnamed_616, min((8u & 31u), (32u - fragment_unnamed_616))) : (fragment_unnamed_605 & 255u)))) >> 5u);
@@ -4720,7 +4720,7 @@ Shader "VF Shaders/Forward/Terrain Reform"
 				float fragment_unnamed_683 = float(((0.625f < fragment_unnamed_576) ? (fragment_unnamed_579 >> 24u) : ((0.375f < fragment_unnamed_576) ? spvBitfieldUExtract(fragment_unnamed_579, fragment_unnamed_585, min((8u & 31u), (32u - fragment_unnamed_585))) : ((0.125f < fragment_unnamed_576) ? spvBitfieldUExtract(fragment_unnamed_579, fragment_unnamed_590, min((8u & 31u), (32u - fragment_unnamed_590))) : (fragment_unnamed_579 & 255u)))) >> 5u);
 				float fragment_unnamed_694 = fragment_unnamed_284 * 0.20000000298023223876953125f;
 				float fragment_unnamed_696 = fragment_unnamed_249 * 0.06366197764873504638671875f;
-				float fragment_unnamed_698 = (fragment_unnamed_282 * float((-_OffsetsBuffer.Load(fragment_unnamed_390).x) + _OffsetsBuffer.Load(fragment_unnamed_390 + 1u).x)) * 0.20000000298023223876953125f;
+				float fragment_unnamed_698 = (fragment_unnamed_282 * float((-_OffsetsBuffer.Load(fragment_unnamed_390)) + _OffsetsBuffer.Load(fragment_unnamed_390 + 1u))) * 0.20000000298023223876953125f;
 				float fragment_unnamed_705 = ddx_coarse(fragment_input_10.x);
 				float fragment_unnamed_706 = ddx_coarse(fragment_input_10.y);
 				float fragment_unnamed_707 = ddx_coarse(fragment_input_10.z);
@@ -4751,7 +4751,7 @@ Shader "VF Shaders/Forward/Terrain Reform"
 				float fragment_unnamed_849;
 				float fragment_unnamed_851;
 				float fragment_unnamed_853;
-				if (((((fragment_unnamed_355 + 0.9900000095367431640625f) < fragment_unnamed_348) ? 4294967295u : 0u) & ((fragment_unnamed_348 < (fragment_unnamed_355 + 1.0099999904632568359375f)) ? 4294967295u : 0u)) != 0u)
+				if ((((((fragment_unnamed_355 + 0.9900000095367431640625f) < fragment_unnamed_348) ? 4294967295u : 0u) & ((fragment_unnamed_348 < (fragment_unnamed_355 + 1.0099999904632568359375f)) ? 4294967295u : 0u)) | (((fragment_unnamed_355 + 3.9900000095367431640625f) < fragment_unnamed_348) ? 4294967295u : 0u)) != 0u)
 				{
 					float4 fragment_unnamed_750 = _AlbedoTex1.SampleLevel(sampler_AlbedoTex1, float2(fragment_unnamed_696, fragment_unnamed_694), fragment_unnamed_735);
 					float4 fragment_unnamed_756 = _AlbedoTex1.SampleLevel(sampler_AlbedoTex1, float2(fragment_unnamed_696, fragment_unnamed_698), fragment_unnamed_735);
@@ -4893,7 +4893,6 @@ Shader "VF Shaders/Forward/Terrain Reform"
 					fragment_unnamed_851 = fragment_unnamed_852;
 					fragment_unnamed_853 = fragment_unnamed_854;
 				}
-				float4 fragment_unnamed_861 = _ColorsTexture.Sample(sampler_ColorsTexture, float2((float(fragment_unnamed_341 & 31u) + 0.5f) * 0.03125f, asfloat(1056964608u)));
 				float fragment_unnamed_869 = fragment_unnamed_861.w * 0.800000011920928955078125f;
 				float fragment_unnamed_871 = mad(fragment_unnamed_861.w, -0.560000002384185791015625f, 1.0f);
 				float fragment_unnamed_879 = exp2(log2(abs(fragment_unnamed_503) + abs(fragment_unnamed_503)) * 10.0f);
@@ -4909,22 +4908,22 @@ Shader "VF Shaders/Forward/Terrain Reform"
 				float fragment_unnamed_923 = ((-0.0f) - mad(fragment_unnamed_879, ((-0.0f) - fragment_unnamed_827) + fragment_unnamed_829, fragment_unnamed_827)) + 1.0f;
 				float fragment_unnamed_928 = fragment_unnamed_923 * fragment_uniform_buffer_0[4u].w;
 				float fragment_unnamed_937 = mad(fragment_unnamed_861.w, mad((-0.0f) - fragment_unnamed_923, fragment_uniform_buffer_0[4u].w, clamp(fragment_unnamed_928 * 5.0f, 0.0f, 1.0f)), fragment_unnamed_928);
-				bool fragment_unnamed_971 = (fragment_unnamed_428 & (fragment_unnamed_431 & (((fragment_unnamed_683 < 0.00999999977648258209228515625f) ? 4294967295u : 0u) | ((6.5f < fragment_unnamed_683) ? 4294967295u : 0u)))) != 0u;
+				bool fragment_unnamed_971 = (fragment_unnamed_428 & (fragment_unnamed_431 & (((fragment_unnamed_683 < 0.00999999977648258209228515625f) ? 4294967295u : 0u)))) != 0u;
 				uint fragment_unnamed_979 = fragment_unnamed_971 ? asuint(fragment_unnamed_737 * fragment_unnamed_919) : asuint(fragment_unnamed_919);
 				uint fragment_unnamed_981 = fragment_unnamed_971 ? asuint(fragment_unnamed_737 * fragment_unnamed_920) : asuint(fragment_unnamed_920);
 				uint fragment_unnamed_983 = fragment_unnamed_971 ? asuint(fragment_unnamed_737 * fragment_unnamed_921) : asuint(fragment_unnamed_921);
 				uint fragment_unnamed_985 = fragment_unnamed_971 ? asuint(fragment_unnamed_737 * asfloat(1065353216u)) : 1065353216u;
-				bool fragment_unnamed_996 = (fragment_unnamed_435 & (fragment_unnamed_425 & (((fragment_unnamed_678 < 0.00999999977648258209228515625f) ? 4294967295u : 0u) | ((6.5f < fragment_unnamed_678) ? 4294967295u : 0u)))) != 0u;
+				bool fragment_unnamed_996 = (fragment_unnamed_435 & (fragment_unnamed_425 & (((fragment_unnamed_678 < 0.00999999977648258209228515625f) ? 4294967295u : 0u)))) != 0u;
 				uint fragment_unnamed_1001 = fragment_unnamed_996 ? asuint(fragment_unnamed_515 * asfloat(fragment_unnamed_979)) : fragment_unnamed_979;
 				uint fragment_unnamed_1003 = fragment_unnamed_996 ? asuint(fragment_unnamed_515 * asfloat(fragment_unnamed_981)) : fragment_unnamed_981;
 				uint fragment_unnamed_1005 = fragment_unnamed_996 ? asuint(fragment_unnamed_515 * asfloat(fragment_unnamed_983)) : fragment_unnamed_983;
 				uint fragment_unnamed_1007 = fragment_unnamed_996 ? asuint(fragment_unnamed_515 * asfloat(fragment_unnamed_985)) : fragment_unnamed_985;
-				bool fragment_unnamed_1016 = (((fragment_unnamed_680 < 0.00999999977648258209228515625f) ? 4294967295u : 0u) | ((6.5f < fragment_unnamed_680) ? 4294967295u : 0u)) != 0u;
+				bool fragment_unnamed_1016 = (((fragment_unnamed_680 < 0.00999999977648258209228515625f) ? 4294967295u : 0u)) != 0u;
 				uint fragment_unnamed_1021 = fragment_unnamed_1016 ? asuint(fragment_unnamed_512 * asfloat(fragment_unnamed_1001)) : fragment_unnamed_1001;
 				uint fragment_unnamed_1023 = fragment_unnamed_1016 ? asuint(fragment_unnamed_512 * asfloat(fragment_unnamed_1003)) : fragment_unnamed_1003;
 				uint fragment_unnamed_1025 = fragment_unnamed_1016 ? asuint(fragment_unnamed_512 * asfloat(fragment_unnamed_1005)) : fragment_unnamed_1005;
 				uint fragment_unnamed_1027 = fragment_unnamed_1016 ? asuint(fragment_unnamed_512 * asfloat(fragment_unnamed_1007)) : fragment_unnamed_1007;
-				bool fragment_unnamed_1036 = (((fragment_unnamed_682 < 0.00999999977648258209228515625f) ? 4294967295u : 0u) | ((6.5f < fragment_unnamed_682) ? 4294967295u : 0u)) != 0u;
+				bool fragment_unnamed_1036 = (((fragment_unnamed_682 < 0.00999999977648258209228515625f) ? 4294967295u : 0u)) != 0u;
 				float fragment_unnamed_1042 = asfloat(fragment_unnamed_1036 ? asuint(fragment_unnamed_514 * asfloat(fragment_unnamed_1027)) : fragment_unnamed_1027);
 				discard_cond((fragment_unnamed_1042 + (-0.00999999977648258209228515625f)) < 0.0f);
 				float4 fragment_unnamed_1062 = _ReformGrab.Sample(sampler_ReformGrab, float2(fragment_input_9.x / fragment_input_9.w, fragment_input_9.y / fragment_input_9.w));
@@ -10030,7 +10029,7 @@ Shader "VF Shaders/Forward/Terrain Reform"
 			#pragma target 5.0
 			/*#pragma shader_feature SHADOWS_CUBE
 			#pragma shader_feature SHADOWS_DEPTH*/
-			#define SHADOWS_CUBE
+			#define SHADOWS_DEPTH
 
 
 			#ifdef SHADOWS_DEPTH
