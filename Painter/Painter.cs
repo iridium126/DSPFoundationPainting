@@ -18,6 +18,8 @@ namespace DSPBasePainter
 	{
 		private static Shader shaderPatch;
 		private static UIButton paintButton;
+		private const int maxPlanetCount = 6;
+		private static readonly Texture2D[] paintingTexs = new Texture2D[maxPlanetCount];
 		private void Start()
 		{
 			Harmony.CreateAndPatchAll(typeof(Painter));
@@ -27,6 +29,8 @@ namespace DSPBasePainter
 			//Debug.Log($"shader_patch.isSupported:{shaderPatch.isSupported}");
 			/*ShaderVariantCollection svc = assetBundle.LoadAsset<ShaderVariantCollection>("ShaderVariants");
 			svc.WarmUp();*/
+			for (int i = 0; i < maxPlanetCount; ++i)
+				paintingTexs[i] = new Texture2D(4096, 5088, TextureFormat.RGBA32, false);
 			StartCoroutine(InitPaintButton());
 		}
 		private IEnumerator InitPaintButton()
@@ -104,8 +108,8 @@ namespace DSPBasePainter
 			}
 			if (chunkData == null || chunkData.Length != 40700)
 				yield break;
-			Texture2D paintingTex = new Texture2D(4096, 5088, TextureFormat.RGBA32, false);
-			if (!paintingTex.LoadImage(pngBytes))
+			PlanetData localPlanet = GameMain.localPlanet;
+			if (!paintingTexs[localPlanet.index].LoadImage(pngBytes))
 				yield break;
 			yield return null;
 			PlayerAction_Build actionBuild = GameMain.mainPlayer.controller.actionBuild;
@@ -126,7 +130,7 @@ namespace DSPBasePainter
 			if (buildTool_BlueprintPaste.tmpModLevel == null)
 				buildTool_BlueprintPaste.tmpModLevel = new Dictionary<int, int>();
 			// 解包地基掩码并生成reformGridIds
-			PlatformSystem platformSystem = GameMain.localPlanet.factory.platformSystem;
+			PlatformSystem platformSystem = localPlanet.factory.platformSystem;
 			for (int byteIndex = 0, x = 0, y = 0; byteIndex < 40700; ++byteIndex)
 			{
 				int startIndex = byteIndex * 8;
@@ -151,8 +155,8 @@ namespace DSPBasePainter
 			if (!buildTool_BlueprintPaste.DetermineReforms())
 				yield break;
 			yield return null;
-			Material reformMat0 = GameMain.localPlanet.reformMaterial0;
-			Material reformMat1 = GameMain.localPlanet.reformMaterial1;
+			Material reformMat0 = localPlanet.reformMaterial0;
+			Material reformMat1 = localPlanet.reformMaterial1;
 			if (reformMat0.shader != shaderPatch || reformMat1.shader != shaderPatch)
 			{
 				reformMat0.shader = shaderPatch;
@@ -169,9 +173,12 @@ namespace DSPBasePainter
 					reformMat1.SetBuffer("_DataBuffer", reformDataBuffer);
 				}
 			}
-			reformMat0.SetTexture("_PaintingTexture", paintingTex);
-			reformMat1.SetTexture("_PaintingTexture", paintingTex);
+			reformMat0.SetTexture("_PaintingTexture", paintingTexs[localPlanet.index]);
+			reformMat1.SetTexture("_PaintingTexture", paintingTexs[localPlanet.index]);
+			//Debug.Log($"receiveShadows : {GameMain.universeSimulator.FindPlanetSimulator(GameMain.localPlanet).reformRenderer.receiveShadows}");//true
+			//Debug.Log($"lightProbeUsage : {GameMain.universeSimulator.FindPlanetSimulator(GameMain.localPlanet).reformRenderer.lightProbeUsage}");//Off
 		}
+
 		[HarmonyTranspiler, HarmonyPatch(typeof(BuildTool_BlueprintPaste), "DetermineReforms")]
 		private static IEnumerable<CodeInstruction> DetermineReforms_Patch(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
 		{
@@ -223,6 +230,41 @@ namespace DSPBasePainter
 				.Insert(
 					new CodeInstruction(OpCodes.Ldc_I4_0),
 					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Painter), "PaintButtonSetActive")))
+				.InstructionEnumeration();
+		}
+		public static bool IsTerrainMapping(int index, int type)
+		{
+			if (type <= 0)
+				return false;
+			else if (type < 7)
+				return true;
+			else if (type == 7)
+			{
+				PlanetData localPlanet = GameMain.localPlanet;
+				if (localPlanet.reformMaterial0.shader != shaderPatch || localPlanet.reformMaterial1.shader != shaderPatch)
+					return false;
+				// 选取地基中心像素，粗略判断
+				if (paintingTexs[localPlanet.index].GetPixel(index % 512 * 8 + 4, 5087 - (index / 512 * 8 + 4)).a == 0f)
+					return false;
+				else
+					return true;
+			}
+			else
+				return false;
+		}
+
+		[HarmonyTranspiler, HarmonyPatch(typeof(PlayerFootsteps), "CheckPlayerInReform")]
+		private static IEnumerable<CodeInstruction> CheckPlayerInReform_Patch(IEnumerable<CodeInstruction> instructions)
+		{
+			CodeMatcher codeMatcher = new CodeMatcher(instructions)
+				.MatchForward(false,
+					new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(PlatformSystem), "IsTerrainMapping")))
+				.Set(
+					OpCodes.Call, AccessTools.Method(typeof(Painter), "IsTerrainMapping"))
+				.MatchBack(false,
+					new CodeMatch(OpCodes.Ldloc_3));
+			return codeMatcher
+				.SetInstruction(codeMatcher.InstructionAt(-3))
 				.InstructionEnumeration();
 		}
 	}
