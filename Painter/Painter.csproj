@@ -79,6 +79,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FileDialog.cs" />
     <Compile Include="Painter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

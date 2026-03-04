@@ -20,6 +20,8 @@ namespace DSPBasePainter
 		private static UIButton paintButton;
 		private const int maxPlanetCount = 6;
 		private static readonly Texture2D[] paintingTexs = new Texture2D[maxPlanetCount];
+		private const string GameSave_CurrentGame = "_currentgame_";
+		private static string textureSaveFolder;
 		private void Start()
 		{
 			Harmony.CreateAndPatchAll(typeof(Painter));
@@ -31,6 +33,7 @@ namespace DSPBasePainter
 			svc.WarmUp();*/
 			for (int i = 0; i < maxPlanetCount; ++i)
 				paintingTexs[i] = new Texture2D(4096, 5088, TextureFormat.RGBA32, false);
+			textureSaveFolder = Config.ConfigFilePath.Substring(0, Config.ConfigFilePath.LastIndexOf('.')) + "/";
 			StartCoroutine(InitPaintButton());
 		}
 		private IEnumerator InitPaintButton()
@@ -267,43 +270,30 @@ namespace DSPBasePainter
 				.SetInstruction(codeMatcher.InstructionAt(-3))
 				.InstructionEnumeration();
 		}
-	}
 
-	// 调用Windows API打开文件对话框
-	public static class FileDialog
-	{
-		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-		public class OpenFileName
+		[HarmonyPostfix, HarmonyPatch(typeof(GameSave), "AutoSave")]
+		private static void AutoSave_Postfix(bool __result)
 		{
-			public int structSize = 0;
-			public IntPtr dlgOwner = IntPtr.Zero;
-			public IntPtr instance = IntPtr.Zero;
-			public String filter = null;
-			public String customFilter = null;
-			public int maxCustFilter = 0;
-			public int filterIndex = 0;
-			public String file = null;
-			public int maxFile = 0;
-			public String fileTitle = null;
-			public int maxFileTitle = 0;
-			public String initialDir = null; // default path
-			public String title = null;
-			public int flags = 0;
-			public short fileOffset = 0;
-			public short fileExtension = 0;
-			public String defExt = null; // default file extension
-			public IntPtr custData = IntPtr.Zero;
-			public IntPtr hook = IntPtr.Zero;
-			public String templateName = null;
-			public IntPtr reservedPtr = IntPtr.Zero;
-			public int reservedInt = 0;
-			public int flagsEx = 0;
+			if (!__result)
+				return;
+			string currentGame = textureSaveFolder + GameSave_CurrentGame;
+			Debug.Log($"AutoSave_Postfix: currentGame={currentGame}");
+			if (Directory.Exists(currentGame))
+			{
+				string autoSave0 = textureSaveFolder + GameSave.AutoSave0;
+				string autoSave1 = textureSaveFolder + GameSave.AutoSave1;
+				string autoSave2 = textureSaveFolder + GameSave.AutoSave2;
+				string autoSave3 = textureSaveFolder + GameSave.AutoSave3;
+				if (Directory.Exists(autoSave3))
+					Directory.Delete(autoSave3, true);
+				if (Directory.Exists(autoSave2))
+					Directory.Move(autoSave2, autoSave3);
+				if (Directory.Exists(autoSave1))
+					Directory.Move(autoSave1, autoSave2);
+				if (Directory.Exists(autoSave0))
+					Directory.Move(autoSave0, autoSave1);
+				Directory.Move(currentGame, autoSave0);
+			}
 		}
-
-		[DllImport("user32.dll")]
-		public static extern IntPtr GetForegroundWindow();
-
-		[DllImport("Comdlg32.dll", SetLastError = true, ThrowOnUnmappableChar = true, CharSet = CharSet.Auto)]
-		public static extern bool GetOpenFileName([In, Out] OpenFileName ofn);
 	}
 }
