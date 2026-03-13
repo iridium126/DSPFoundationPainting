@@ -153,7 +153,20 @@ namespace DSPBasePainter
 			}
 			BuildTool_Reform buildTool_Reform = actionBuild.reformTool;
 			buildTool_Reform.brushType = 7;
-			buildTool_Reform.buryVeins = true;
+			if (!buildTool_Reform.buryVeins)
+			{
+				UIBuildMenu buildMenu = UIRoot.instance.uiGame.buildMenu;
+				UIButton veinBuriedButton = buildMenu.veinBuriedButton;
+				veinBuriedButton.transitions[0].normalColor = buildMenu.buriedNormalColor;
+				veinBuriedButton.transitions[0].mouseoverColor = buildMenu.buriedMouseoverColor;
+				veinBuriedButton.transitions[0].pressedColor = buildMenu.buriedPressedColor;
+				veinBuriedButton.tips.tipTitle = "矿物掩埋标题";
+				veinBuriedButton.tips.tipText = "矿物掩埋";
+				buildMenu.buriedIcon.sprite = buildMenu.buriedSprite;
+				buildTool_Reform.buryVeins = true;
+				veinBuriedButton.UpdateTip();
+				veinBuriedButton.RefreshTransitionsImmediately();
+			}
 			buildTool_BlueprintPaste.result = EBlueprintPasteResult.BuildingNeedReform | (EBlueprintPasteResult)8;
 			if (!buildTool_BlueprintPaste.DetermineReforms())
 				yield break;
@@ -271,7 +284,7 @@ namespace DSPBasePainter
 				.InstructionEnumeration();
 		}
 
-		[HarmonyPostfix, HarmonyPatch(typeof(GameSave), "AutoSave")]
+		/*[HarmonyPostfix, HarmonyPatch(typeof(GameSave), "AutoSave")]
 		private static void AutoSave_Postfix(bool __result)
 		{
 			if (!__result)
@@ -294,6 +307,6 @@ namespace DSPBasePainter
 					Directory.Move(autoSave0, autoSave1);
 				Directory.Move(currentGame, autoSave0);
 			}
-		}
+		}*/
 	}
 }
