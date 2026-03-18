@@ -17,3 +17,6 @@
 3. 减小Calculator中间数据文件大小
 4. 使用多线程和计算着色器加速Calculator计算
 5. 编写英文README
+## 开源协议
+**[MIT](https://github.com/iridium126/DSPFoundationPainting/blob/main/LICENSE)** © iridium126
+> Calculator使用的Qt模块本身遵循 **[LGPLv3](https://github.com/iridium126/DSPFoundationPainting/blob/main/Calculator/LICENSE-LGPL-3.0)** 许可证
