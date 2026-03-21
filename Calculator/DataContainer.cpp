@@ -1,5 +1,35 @@
-#include "DataContainer.h"
+﻿#include "DataContainer.h"
 #include "DataGenerator.h"
+
+TileData::TileData(const QPointF& uv, const QPoint& pos)
+{
+	// 0~1浮点数转19位无符号定点数
+	uint32_t u_fixed = static_cast<uint32_t>(uv.x() * FIXED_SCALE);
+	uint32_t v_fixed = static_cast<uint32_t>(uv.y() * FIXED_SCALE);
+	packed_data = (static_cast<uint64_t>(u_fixed) << 45) | (static_cast<uint64_t>(pos.x()) << 32) | (static_cast<uint64_t>(v_fixed) << 13) | static_cast<uint64_t>(pos.y());
+}
+
+const qreal TileData::u() const
+{
+	uint32_t u_fixed = (packed_data >> 45) & 0x7FFFF;
+	return static_cast<qreal>(u_fixed) / FIXED_SCALE;
+}
+
+const qreal TileData::v() const
+{
+	uint32_t v_fixed = (packed_data >> 13) & 0x7FFFF;
+	return static_cast<qreal>(v_fixed) / FIXED_SCALE;
+}
+
+const int TileData::x() const
+{
+	return (packed_data >> 32) & 0x1FFF;
+}
+
+const int TileData::y() const
+{
+	return packed_data & 0x1FFF;
+}
 
 DataContainer::DataContainer(qreal polar_angle, qreal azimuth_angle, qreal painting_central_angle) :
 	polar_angle(polar_angle), azimuth_angle(azimuth_angle), painting_central_angle(painting_central_angle)

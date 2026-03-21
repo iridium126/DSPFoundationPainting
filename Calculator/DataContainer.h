@@ -14,10 +14,14 @@ class TileData
 	friend DataAccessor;
 public:
 	TileData() = default;
-	TileData(const QPointF& uv, const QPoint& pos) :uv(uv), texture_pos(pos) {}
+	TileData(const QPointF& uv, const QPoint& pos);
 private:
-	QPointF uv;
-	QPoint texture_pos; // 瓦片在纹理中的像素坐标
+	static constexpr uint32_t FIXED_SCALE = (1 << 19) - 1;
+	uint64_t packed_data; // 将uv坐标和纹理坐标打包成一个64位整数，节省空间
+	const qreal u() const;
+	const qreal v() const;
+	const int x() const;
+	const int y() const;
 };
 
 class DataContainer
