@@ -3,14 +3,6 @@
 QImage DataAccessor::output(4096, 5088, QImage::Format_RGBA8888);
 bool DataAccessor::foundation_mask[325632] = { false };
 
-DataAccessor::DataAccessor(DataContainer& container) :container(container)
-{
-}
-
-DataAccessor::~DataAccessor()
-{
-}
-
 bool DataAccessor::ProcessPicture(const QString& fileName)
 {
 	QImage input(fileName);

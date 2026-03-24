@@ -30,7 +30,7 @@ class DataGenerator
 {
 public:
 	DataGenerator(DataContainer& container);
-	~DataGenerator();
+	~DataGenerator() = default;
 
 private:
 	DataContainer& container;

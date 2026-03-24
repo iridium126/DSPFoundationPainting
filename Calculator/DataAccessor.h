@@ -6,8 +6,8 @@
 class DataAccessor
 {
 public:
-	DataAccessor(DataContainer& container);
-	~DataAccessor();
+	DataAccessor(DataContainer& container) :container(container) {}
+	~DataAccessor() = default;
 	bool ProcessPicture(const QString& fileName);
 private:
 	DataContainer& container;

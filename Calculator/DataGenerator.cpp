@@ -9,10 +9,6 @@ DataGenerator::DataGenerator(DataContainer& container) :container(container)
 	ProcessData();
 }
 
-DataGenerator::~DataGenerator()
-{
-}
-
 void DataGenerator::GenerateData()
 {
 	bool p_0_in_painting, p_90_a_0_in_painting, p_90_a_90_in_painting, p_90_a_180_in_painting, p_90_a_270_in_painting, p_180_in_painting;
