@@ -1,4 +1,5 @@
 ﻿#include "DataAccessor.h"
+#include "Calculator.h"
 
 QImage DataAccessor::output(4096, 5088, QImage::Format_RGBA8888);
 bool DataAccessor::foundation_mask[325632] = { false };
@@ -16,15 +17,49 @@ bool DataAccessor::ProcessPicture(const QString& fileName)
 	if (input.format() != QImage::Format_ARGB32)
 		input = input.convertToFormat(QImage::Format_ARGB32);
 	output.fill(Qt::transparent);
-	for (auto& tile : container.data)
+	if (Calculator::thread_count > 1)
 	{
-		const QRgb* line_in = reinterpret_cast<const QRgb*>(input.constScanLine(offset_i + tile.v() * min_side));
-		QRgb* line_out = reinterpret_cast<QRgb*>(output.scanLine(tile.x()));
-		QRgb pixel = line_in[static_cast<int>(offset_j + (1 - tile.u()) * min_side)];
-		// 将ARGB32格式转换为RGBA8888格式（交换R和B通道）
-		line_out[tile.y()] = pixel & 0xFF00FF00 | ((pixel & 0x00FF0000) >> 16) | ((pixel & 0x000000FF) << 16);
+		int batch_size = (container.data.size() + Calculator::thread_count - 1) / Calculator::thread_count;
+		for (int t = 0; t < Calculator::thread_count; ++t)
+		{
+			auto beg = container.data.cbegin() + t * batch_size;
+			auto end = (t == Calculator::thread_count - 1) ? container.data.cend() : container.data.cbegin() + (t + 1) * batch_size;
+			Calculator::computePool->start([this, beg, end, &input, offset_i, offset_j, min_side]() {
+				for (auto it = beg; it != end; ++it)
+				{
+					const auto& tile = *it;
+					const QRgb* line_in = reinterpret_cast<const QRgb*>(input.constScanLine(offset_i + tile.v() * min_side));
+					QRgb* line_out = reinterpret_cast<QRgb*>(output.scanLine(tile.x()));
+					QRgb pixel = line_in[static_cast<int>(offset_j + (1 - tile.u()) * min_side)];
+					// 将ARGB32格式转换为RGBA8888格式（交换R和B通道）
+					line_out[tile.y()] = pixel & 0xFF00FF00 | ((pixel & 0x00FF0000) >> 16) | ((pixel & 0x000000FF) << 16);
+				}
+				});
+		}
+		Calculator::computePool->waitForDone();
+		batch_size = (5088 / 8 + Calculator::thread_count - 1) / Calculator::thread_count;
+		for (int t = 0; t < Calculator::thread_count; ++t)
+		{
+			int start_row = t * batch_size;
+			int end_row = (t == Calculator::thread_count - 1) ? (5088 / 8) : (t + 1) * batch_size;
+			Calculator::computePool->start([this, start_row, end_row]() {
+				generate_foundation_mask(output.bits(), start_row, end_row);
+				});
+		}
+		Calculator::computePool->waitForDone();
 	}
-	generate_foundation_mask(output.bits(), 0, 5088 / 8);
+	else
+	{
+		for (const auto& tile : container.data)
+		{
+			const QRgb* line_in = reinterpret_cast<const QRgb*>(input.constScanLine(offset_i + tile.v() * min_side));
+			QRgb* line_out = reinterpret_cast<QRgb*>(output.scanLine(tile.x()));
+			QRgb pixel = line_in[static_cast<int>(offset_j + (1 - tile.u()) * min_side)];
+			// 将ARGB32格式转换为RGBA8888格式（交换R和B通道）
+			line_out[tile.y()] = pixel & 0xFF00FF00 | ((pixel & 0x00FF0000) >> 16) | ((pixel & 0x000000FF) << 16);
+		}
+		generate_foundation_mask(output.bits(), 0, 5088 / 8);
+	}
 	return write_texture(fileName.left(fileName.lastIndexOf('.')) + "_texture.png", output);
 }
 
@@ -75,7 +110,6 @@ std::vector<uint8_t> DataAccessor::pack_bools_to_bytes()
 
 bool DataAccessor::write_texture(const QString& filePath, const QImage& image)
 {
-	auto byte_data = pack_bools_to_bytes();
 	FILE* fp = nullptr;
 	if (_wfopen_s(&fp, filePath.toStdWString().c_str(), L"wb") != 0)
 		return false;
@@ -107,6 +141,7 @@ bool DataAccessor::write_texture(const QString& filePath, const QImage& image)
 	png_write_image(png_ptr, row_pointers.data());
 	// 添加PNG私有块
 	png_byte chunk_name[] = { 'f', 'm', 's', 'k' };
+	auto byte_data = pack_bools_to_bytes();
 	png_write_chunk(png_ptr, chunk_name,
 		reinterpret_cast<png_const_bytep>(byte_data.data()),
 		byte_data.size());

@@ -19,6 +19,8 @@ class Calculator : public QMainWindow
 public:
 	Calculator(QWidget* parent = nullptr);
 	~Calculator();
+	static int thread_count;
+	static QThreadPool* computePool;
 
 private:
 	Ui::CalculatorClass ui;

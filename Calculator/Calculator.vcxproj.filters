@@ -60,5 +60,8 @@
     <ClInclude Include="DataAccessor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RunnablePool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

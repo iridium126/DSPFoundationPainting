@@ -14,7 +14,8 @@ namespace std {
 	};
 }
 
-class TileRawData {
+class TileRawData
+{
 	friend DataGenerator;
 public:
 	TileRawData(int index[], int ipos, int jpos) :texture_pos(ipos, jpos)

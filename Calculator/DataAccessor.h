@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "DataContainer.h"
 #include <QImage>
+#include <QThreadPool>
 #include <png.h>
 
 class DataAccessor

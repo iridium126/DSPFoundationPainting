@@ -105,6 +105,7 @@
     <ClInclude Include="DataAccessor.h" />
     <ClInclude Include="DataContainer.h" />
     <ClInclude Include="DataGenerator.h" />
+    <ClInclude Include="RunnablePool.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

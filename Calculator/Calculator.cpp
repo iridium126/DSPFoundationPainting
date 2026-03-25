@@ -1,9 +1,18 @@
 ﻿#include "Calculator.h"
 
+int Calculator::thread_count = QThread::idealThreadCount() - 1;
+QThreadPool* Calculator::computePool = nullptr;
+
 Calculator::Calculator(QWidget* parent)
 	: QMainWindow(parent)
 {
 	ui.setupUi(this);
+	// 创建计算线程池，默认线程数为CPU核心数-1，保留一个核心给UI线程
+	if (!computePool)
+	{
+		computePool = new QThreadPool(this);
+		computePool->setMaxThreadCount(thread_count);
+	}
 	QWidget* centralWgt = new QWidget(this);
 	QVBoxLayout* vMainLayout = new QVBoxLayout(centralWgt);
 	setCentralWidget(centralWgt);
@@ -119,6 +128,8 @@ Calculator::Calculator(QWidget* parent)
 		if (phi < 0)
 			phi += 2 * M_PI;
 		qreal central_angle = degSlider->value() * M_PI / MAX_DEG;
+		if (thread_count > 1)
+			computePool->setMaxThreadCount(thread_count);
 		if (container == nullptr || container->polar_angle != theta || container->azimuth_angle != phi ||
 			container->painting_central_angle != central_angle)
 		{
@@ -127,10 +138,45 @@ Calculator::Calculator(QWidget* parent)
 		}
 		accessor->ProcessPicture(fileEdit->text());
 		});
+
+	// 线程数滑动条
+	QHBoxLayout* threadLayout = new QHBoxLayout();
+	QLabel* threadLabel = new QLabel(tr("线程数:"), this);
+	QSlider* threadSlider = new QSlider(Qt::Horizontal, this);
+	QLineEdit* threadEdit = new QLineEdit(QString::number(thread_count), this);
+
+	const int MIN_THREAD = 1;
+	const int MAX_THREAD = QThread::idealThreadCount();
+	threadSlider->setRange(MIN_THREAD, MAX_THREAD);
+	threadSlider->setValue(thread_count);
+	threadSlider->setSingleStep(1);
+	threadEdit->setValidator(new QIntValidator(MIN_THREAD, MAX_THREAD, this));
+
+	threadLayout->addWidget(threadSlider, 3);
+	threadLayout->addWidget(threadEdit, 1);
+	threadLayout->setSpacing(15);
+
+	connect(threadSlider, &QSlider::valueChanged, this, [=](int value) {
+		threadEdit->setText(QString::number(value));
+		Calculator::thread_count = value;
+		});
+	connect(threadEdit, &QLineEdit::textChanged, this, [=](const QString& text) {
+		bool ok = false;
+		int value = text.toInt(&ok);
+		if (ok && value >= MIN_THREAD && value <= MAX_THREAD) {
+			threadSlider->setValue(value);
+			Calculator::thread_count = value;
+		}
+		});
+
+	vMainLayout->addWidget(threadLabel);
+	vMainLayout->addLayout(threadLayout);
 }
 
 Calculator::~Calculator()
 {
+	if (computePool)
+		computePool->waitForDone();
 }
 
 void Calculator::addDmsSlider(QVBoxLayout* mainLayout, QSlider*& slider,
