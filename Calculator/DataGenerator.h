@@ -35,7 +35,6 @@ public:
 
 private:
 	DataContainer& container;
-	int point_count = 0;
 	QHash<QPointF, int> index_map;
 	std::vector<QPointF> points;
 	std::vector<TileRawData> raw_data;

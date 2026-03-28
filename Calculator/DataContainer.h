@@ -16,14 +16,18 @@ public:
 	TileData() = default;
 	TileData(const QPointF& uv, const QPoint& pos)
 	{
+		setData(uv, pos);
+	}
+private:
+	uint64_t packed_data; // 将uv坐标和纹理坐标打包成一个64位整数，节省空间
+	static constexpr uint32_t FIXED_SCALE = (1 << 19) - 1;
+	void setData(const QPointF& uv, const QPoint& pos)
+	{
 		// 0~1浮点数转19位无符号定点数
 		uint32_t u_fixed = static_cast<uint32_t>(uv.x() * FIXED_SCALE);
 		uint32_t v_fixed = static_cast<uint32_t>(uv.y() * FIXED_SCALE);
 		packed_data = (static_cast<uint64_t>(u_fixed) << 45) | (static_cast<uint64_t>(pos.x()) << 32) | (static_cast<uint64_t>(v_fixed) << 13) | static_cast<uint64_t>(pos.y());
 	}
-private:
-	static constexpr uint32_t FIXED_SCALE = (1 << 19) - 1;
-	uint64_t packed_data; // 将uv坐标和纹理坐标打包成一个64位整数，节省空间
 	const qreal u() const
 	{
 		uint32_t u_fixed = (packed_data >> 45) & 0x7FFFF;

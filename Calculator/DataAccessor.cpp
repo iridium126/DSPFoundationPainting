@@ -126,9 +126,9 @@ bool DataAccessor::write_texture(const QString& filePath, const QImage& image)
 	// 设置PNG图片参数（基于QImage）
 	int height = image.height();
 	png_set_IHDR(png_ptr, info_ptr,
-		image.width(), height,  // 宽高
-		8,                          // 位深度（8位/通道）
-		PNG_COLOR_TYPE_RGBA,        // 颜色类型（RGBA）
+		image.width(), height, // 宽高
+		8,                     // 位深度（8位/通道）
+		PNG_COLOR_TYPE_RGBA,   // 颜色类型（RGBA）
 		PNG_INTERLACE_NONE,
 		PNG_COMPRESSION_TYPE_DEFAULT,
 		PNG_FILTER_TYPE_DEFAULT);

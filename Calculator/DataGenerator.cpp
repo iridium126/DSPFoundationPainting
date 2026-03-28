@@ -1,7 +1,9 @@
 ﻿#include "DataGenerator.h"
+#include "Calculator.h"
 
 DataGenerator::DataGenerator(DataContainer& container) :container(container)
 {
+	// 经测试，并行分配内存收益不及线程调度开销
 	index_map.reserve(100000);
 	points.reserve(10000000);
 	raw_data.reserve(10000000);
@@ -422,33 +424,33 @@ void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int m
 				}
 				else
 				{
-					index[0] = (*(raw_data.end() - 1)).point_index[1];
+					index[0] = (*(raw_data.cend() - 1)).point_index[1];
+					index[2] = (*(raw_data.cend() - 1)).point_index[3];
 					QPointF point1(min_polar_angle, min_azimuth_angle + minimal_azimuth_angle * j);
 					index[1] = get_point_index(point1);
-					index[2] = (*(raw_data.end() - 1)).point_index[3];
 				}
 			}
 			else
 			{
 				if (j == 1)
 				{
-					index[0] = (*(raw_data.end() - length_j)).point_index[2];
-					index[1] = (*(raw_data.end() - length_j)).point_index[3];
+					index[0] = (*(raw_data.cend() - length_j)).point_index[2];
+					index[1] = (*(raw_data.cend() - length_j)).point_index[3];
 					QPointF point2(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle);
 					index[2] = get_point_index(point2);
 				}
 				else
 				{
-					index[0] = (*(raw_data.end() - 1)).point_index[1];
-					index[1] = (*(raw_data.end() - length_j)).point_index[3];
-					index[2] = (*(raw_data.end() - 1)).point_index[3];
+					index[0] = (*(raw_data.cend() - 1)).point_index[1];
+					index[1] = (*(raw_data.cend() - length_j)).point_index[3];
+					index[2] = (*(raw_data.cend() - 1)).point_index[3];
 				}
 			}
 			QPointF point3(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle + minimal_azimuth_angle * j);
 			if (i < length_i && j < length_j)
 			{
+				index[3] = points.size();
 				points.push_back(point3);
-				index[3] = point_count++;
 			}
 			else
 				index[3] = get_point_index(point3);
@@ -465,23 +467,63 @@ int DataGenerator::get_point_index(const QPointF& point)
 		index = index_map.value(point);
 	else
 	{
-		index_map.insert(point, point_count);
+		index = points.size();
 		points.push_back(point);
-		index = point_count++;
+		index_map.insert(point, index);
 	}
 	return index;
 }
 
 void DataGenerator::ProcessData()
 {
-	container.data.reserve(raw_data.size());
-	for (auto& point : points)
-		point = spherical_to_screen_uv(point);
-	for (auto& tile : raw_data)
+	if (Calculator::thread_count > 1)
 	{
-		auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
-		auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
-		container.data.emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+		int thread_count_less_one = Calculator::thread_count - 1;
+		int batch_size = (points.size() + thread_count_less_one - 1) / thread_count_less_one;
+		for (int t = 0; t < thread_count_less_one; ++t)
+		{
+			auto beg = points.begin() + t * batch_size;
+			auto end = (t == thread_count_less_one - 1) ? points.end() : points.begin() + (t + 1) * batch_size;
+			Calculator::computePool->start([this, beg, end]() {
+				for (auto it = beg; it != end; ++it)
+				{
+					auto& point = *it;
+					point = spherical_to_screen_uv(point);
+				}
+				});
+		}
+		Calculator::computePool->start([this]() {
+			container.data.resize(raw_data.size());
+			});
+		Calculator::computePool->waitForDone();
+		batch_size = (raw_data.size() + Calculator::thread_count - 1) / Calculator::thread_count;
+		for (int t = 0; t < Calculator::thread_count; ++t)
+		{
+			auto beg = raw_data.cbegin() + t * batch_size;
+			auto end = (t == Calculator::thread_count - 1) ? raw_data.cend() : raw_data.cbegin() + (t + 1) * batch_size;
+			Calculator::computePool->start([this, beg, end, t, batch_size]() {
+				for (auto it = beg; it != end; ++it)
+				{
+					auto& tile = *it;
+					auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
+					auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
+					container.data[t * batch_size + (it - beg)].setData(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+				}
+				});
+		}
+		Calculator::computePool->waitForDone();
+	}
+	else
+	{
+		container.data.reserve(raw_data.size());
+		for (auto& point : points)
+			point = spherical_to_screen_uv(point);
+		for (auto& tile : raw_data)
+		{
+			auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
+			auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
+			container.data.emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+		}
 	}
 }
 
