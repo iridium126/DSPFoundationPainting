@@ -1,7 +1,8 @@
 ﻿#pragma once
 #include "DataContainer.h"
+#include "RunnablePool.h"
 #include <QHash>
-#include <qmath.h>
+#include <QMutex>
 
 namespace std {
 	template<>
@@ -18,13 +19,18 @@ class TileRawData
 {
 	friend DataGenerator;
 public:
-	TileRawData(int index[], int ipos, int jpos) :texture_pos(ipos, jpos)
+	TileRawData(uint index[], const QPoint& pos) :texture_pos(pos)
 	{
-		memcpy(point_index, index, 4 * sizeof(int));
+		memcpy(point_index, index, 4 * sizeof(uint));
 	}
 private:
-	int point_index[4];
+	uint point_index[4];
 	QPoint texture_pos; // 瓦片在纹理中的像素坐标
+	void setData(uint index[], const QPoint& pos)
+	{
+		memcpy(point_index, index, 4 * sizeof(uint));
+		texture_pos = pos;
+	}
 };
 
 class DataGenerator
@@ -35,9 +41,12 @@ public:
 
 private:
 	DataContainer& container;
-	QHash<QPointF, int> index_map;
+	QHash<QPointF, uint> index_map;
 	std::vector<QPointF> points;
-	std::vector<TileRawData> raw_data;
+	std::vector<TileRawData, no_init_allocator<TileRawData>> raw_data;
+	std::atomic<uint> raw_data_size = 0;
+	QMutex mutex; // 保护index_map和points的互斥锁
+	RunnablePool<std::function<void()>> runnablePool;
 
 	void GenerateData();
 	// 参数表示的区域有且仅有部分地基在图片范围内，四个bool类型参数表示四个定点调用point_is_in_painting的返回值
@@ -54,7 +63,7 @@ private:
 	void get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle, int& latitude_length);
 	void init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
 	void init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
-	int get_point_index(const QPointF& point);
+	uint get_point_index(const QPointF& point);
 
 	void ProcessData();
 	QPointF spherical_to_screen_uv(const QPointF& point);

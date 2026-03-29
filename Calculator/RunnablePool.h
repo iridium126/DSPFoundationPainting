@@ -11,10 +11,7 @@
 template <typename Func>
 class PooledRunnable;
 
-/**
- * @brief 对象池，用于管理可复用的 Runnable
- * 线程安全。
- */
+// 对象池，用于管理可复用的 Runnable
 template <typename Func>
 class RunnablePool
 {
@@ -23,13 +20,13 @@ public:
 
 	~RunnablePool()
 	{
-		QMutexLocker lock(&mutex);
+		QMutexLocker locker(&mutex);
 		for (auto* ptr : pool) delete ptr;
 	}
 	// 获取一个可用的 Runnable
 	RunnableType* acquire(Func&& func)
 	{
-		QMutexLocker lock(&mutex);
+		QMutexLocker locker(&mutex);
 		if (!pool.empty()) {
 			auto* ptr = pool.back();
 			pool.pop_back();
@@ -43,7 +40,7 @@ public:
 	// 回收 Runnable
 	void release(RunnableType* ptr)
 	{
-		QMutexLocker lock(&mutex);
+		QMutexLocker locker(&mutex);
 		pool.push_back(ptr);
 	}
 
@@ -52,9 +49,7 @@ private:
 	std::vector<RunnableType*> pool;
 };
 
-/**
- * @brief 支持池化的 Runnable 类
- */
+// 支持池化的 Runnable 类
 template <typename Func>
 class PooledRunnable : public QRunnable
 {
@@ -80,3 +75,12 @@ private:
 	std::decay_t<Func> func;
 	Pool* pool;
 };
+
+// 辅助工厂函数，用于自动推导模板类型
+template <typename Func>
+inline void CreateAndStartRunnable(QThreadPool* threadPool, RunnablePool<Func>* runnablePool, Func&& func)
+{
+	//auto* runnable = runnablePool->acquire(std::forward<Func>(func));
+	//threadPool->start(runnable);
+	threadPool->start(func);
+}
