@@ -1,12 +1,16 @@
 ﻿#include "DataContainer.h"
 #include "DataGenerator.h"
+#include "Calculator.h"
 
 DataContainer::DataContainer(qreal polar_angle, qreal azimuth_angle, qreal painting_central_angle) :
 	polar_angle(polar_angle), azimuth_angle(azimuth_angle), painting_central_angle(painting_central_angle)
 {
 	if (!Load())
 	{
-		DataGenerator generator(*this);
+		if (Calculator::thread_count > 1)
+			DataGenerator<true> generator(*this);
+		else
+			DataGenerator<false> generator(*this);
 		Save();
 	}
 }

@@ -1,20 +1,27 @@
 ﻿#include "DataGenerator.h"
 #include "Calculator.h"
 
-DataGenerator::DataGenerator(DataContainer& container) :container(container)
+template <bool parallel>
+DataGenerator<parallel>::DataGenerator(DataContainer& container) :DataGeneratorBase(container)
 {
 	// 经测试，并行分配内存收益不及线程调度开销
-	index_map.reserve(100000);
-	points.reserve(10000000);
-	if (Calculator::thread_count > 1)
+	if constexpr (parallel)
+	{
+		points.resize(10000000);
 		raw_data.resize(10000000);
+	}
 	else
+	{
+		this->index_map.reserve(100000);
+		points.reserve(10000000);
 		raw_data.reserve(10000000);
+	}
 	GenerateData();
 	ProcessData();
 }
 
-void DataGenerator::GenerateData()
+template <bool parallel>
+void DataGenerator<parallel>::GenerateData()
 {
 	bool p_0_in_painting, p_90_a_0_in_painting, p_90_a_90_in_painting, p_90_a_180_in_painting, p_90_a_270_in_painting, p_180_in_painting;
 	bool low_p_1_a_zone = true, low_p_2_a_zone = true, low_p_3_a_zone = true, low_p_4_a_zone = true, high_p_1_a_zone = true, high_p_2_a_zone = true, high_p_3_a_zone = true, high_p_4_a_zone = true;
@@ -27,8 +34,10 @@ void DataGenerator::GenerateData()
 	if (!p_0_in_painting || !p_90_a_0_in_painting || !p_90_a_90_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_0_in_painting || p_90_a_90_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(0, M_PI_2, 0, M_PI_2, p_0_in_painting, p_0_in_painting, p_90_a_0_in_painting, p_90_a_90_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(0, M_PI_2, 0, M_PI_2, p_0_in_painting, p_0_in_painting, p_90_a_0_in_painting, p_90_a_90_in_painting);
+					});
 			else
 				GenerateData(0, M_PI_2, 0, M_PI_2, p_0_in_painting, p_0_in_painting, p_90_a_0_in_painting, p_90_a_90_in_painting);
 		low_p_1_a_zone = false;
@@ -36,8 +45,10 @@ void DataGenerator::GenerateData()
 	if (!p_0_in_painting || !p_90_a_90_in_painting || !p_90_a_180_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_90_in_painting || p_90_a_180_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(0, M_PI_2, M_PI_2, M_PI, p_0_in_painting, p_0_in_painting, p_90_a_90_in_painting, p_90_a_180_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(0, M_PI_2, M_PI_2, M_PI, p_0_in_painting, p_0_in_painting, p_90_a_90_in_painting, p_90_a_180_in_painting);
+					});
 			else
 				GenerateData(0, M_PI_2, M_PI_2, M_PI, p_0_in_painting, p_0_in_painting, p_90_a_90_in_painting, p_90_a_180_in_painting);
 		low_p_2_a_zone = false;
@@ -45,8 +56,10 @@ void DataGenerator::GenerateData()
 	if (!p_0_in_painting || !p_90_a_180_in_painting || !p_90_a_270_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_180_in_painting || p_90_a_270_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(0, M_PI_2, M_PI, M_PI_2 * 3, p_0_in_painting, p_0_in_painting, p_90_a_180_in_painting, p_90_a_270_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(0, M_PI_2, M_PI, M_PI_2 * 3, p_0_in_painting, p_0_in_painting, p_90_a_180_in_painting, p_90_a_270_in_painting);
+					});
 			else
 				GenerateData(0, M_PI_2, M_PI, M_PI_2 * 3, p_0_in_painting, p_0_in_painting, p_90_a_180_in_painting, p_90_a_270_in_painting);
 		low_p_3_a_zone = false;
@@ -54,8 +67,10 @@ void DataGenerator::GenerateData()
 	if (!p_0_in_painting || !p_90_a_270_in_painting || !p_90_a_0_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_270_in_painting || p_90_a_0_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(0, M_PI_2, M_PI_2 * 3, M_PI * 2, p_0_in_painting, p_0_in_painting, p_90_a_270_in_painting, p_90_a_0_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(0, M_PI_2, M_PI_2 * 3, M_PI * 2, p_0_in_painting, p_0_in_painting, p_90_a_270_in_painting, p_90_a_0_in_painting);
+					});
 			else
 				GenerateData(0, M_PI_2, M_PI_2 * 3, M_PI * 2, p_0_in_painting, p_0_in_painting, p_90_a_270_in_painting, p_90_a_0_in_painting);
 		low_p_4_a_zone = false;
@@ -63,8 +78,10 @@ void DataGenerator::GenerateData()
 	if (!p_180_in_painting || !p_90_a_0_in_painting || !p_90_a_90_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_0_in_painting || p_90_a_90_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(M_PI_2, M_PI, 0, M_PI_2, p_90_a_0_in_painting, p_90_a_90_in_painting, p_180_in_painting, p_180_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(M_PI_2, M_PI, 0, M_PI_2, p_90_a_0_in_painting, p_90_a_90_in_painting, p_180_in_painting, p_180_in_painting);
+					});
 			else
 				GenerateData(M_PI_2, M_PI, 0, M_PI_2, p_90_a_0_in_painting, p_90_a_90_in_painting, p_180_in_painting, p_180_in_painting);
 		high_p_1_a_zone = false;
@@ -72,8 +89,10 @@ void DataGenerator::GenerateData()
 	if (!p_180_in_painting || !p_90_a_90_in_painting || !p_90_a_180_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_90_in_painting || p_90_a_180_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(M_PI_2, M_PI, M_PI_2, M_PI, p_90_a_90_in_painting, p_90_a_180_in_painting, p_180_in_painting, p_180_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(M_PI_2, M_PI, M_PI_2, M_PI, p_90_a_90_in_painting, p_90_a_180_in_painting, p_180_in_painting, p_180_in_painting);
+					});
 			else
 				GenerateData(M_PI_2, M_PI, M_PI_2, M_PI, p_90_a_90_in_painting, p_90_a_180_in_painting, p_180_in_painting, p_180_in_painting);
 		high_p_2_a_zone = false;
@@ -81,8 +100,10 @@ void DataGenerator::GenerateData()
 	if (!p_180_in_painting || !p_90_a_180_in_painting || !p_90_a_270_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_180_in_painting || p_90_a_270_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(M_PI_2, M_PI, M_PI, M_PI_2 * 3, p_90_a_180_in_painting, p_90_a_270_in_painting, p_180_in_painting, p_180_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(M_PI_2, M_PI, M_PI, M_PI_2 * 3, p_90_a_180_in_painting, p_90_a_270_in_painting, p_180_in_painting, p_180_in_painting);
+					});
 			else
 				GenerateData(M_PI_2, M_PI, M_PI, M_PI_2 * 3, p_90_a_180_in_painting, p_90_a_270_in_painting, p_180_in_painting, p_180_in_painting);
 		high_p_3_a_zone = false;
@@ -90,8 +111,10 @@ void DataGenerator::GenerateData()
 	if (!p_180_in_painting || !p_90_a_270_in_painting || !p_90_a_0_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_270_in_painting || p_90_a_0_in_painting)
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(M_PI_2, M_PI, M_PI_2 * 3, M_PI * 2, p_90_a_270_in_painting, p_90_a_0_in_painting, p_180_in_painting, p_180_in_painting); }));
+			if constexpr (parallel)
+				Calculator::computePool->start([=]() {
+				GenerateData(M_PI_2, M_PI, M_PI_2 * 3, M_PI * 2, p_90_a_270_in_painting, p_90_a_0_in_painting, p_180_in_painting, p_180_in_painting);
+					});
 			else
 				GenerateData(M_PI_2, M_PI, M_PI_2 * 3, M_PI * 2, p_90_a_270_in_painting, p_90_a_0_in_painting, p_180_in_painting, p_180_in_painting);
 		high_p_4_a_zone = false;
@@ -125,7 +148,8 @@ void DataGenerator::GenerateData()
 		Calculator::computePool->waitForDone();
 }
 
-void DataGenerator::GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting)
+template <bool parallel>
+void DataGenerator<parallel>::GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting)
 {
 	qreal mid_polar_angle, mid_azimuth_angle;
 	mid_polar_angle = get_nearest_multiple((min_polar_angle + max_polar_angle) / 2, M_PI / 500 / edge_segments);
@@ -213,8 +237,15 @@ void DataGenerator::GenerateData(qreal min_polar_angle, qreal max_polar_angle, q
 	{
 		if ((min_p_min_a_in_painting || min_p_mid_a_in_painting || mid_p_min_a_in_painting || mid_p_mid_a_in_painting)
 			&& (!float_equal(mid_polar_angle - min_polar_angle, M_PI / 500 / edge_segments) || !float_equal(mid_azimuth_angle - min_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + min_polar_angle) / 2))))
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(min_polar_angle, mid_polar_angle, min_azimuth_angle, mid_azimuth_angle, min_p_min_a_in_painting, min_p_mid_a_in_painting, mid_p_min_a_in_painting, mid_p_mid_a_in_painting); }));
+			if constexpr (parallel)
+			{
+				if (max_polar_angle - min_polar_angle > M_PI / 50)
+					Calculator::computePool->start([=]() {
+					GenerateData(min_polar_angle, mid_polar_angle, min_azimuth_angle, mid_azimuth_angle, min_p_min_a_in_painting, min_p_mid_a_in_painting, mid_p_min_a_in_painting, mid_p_mid_a_in_painting);
+						});
+				else
+					GenerateData(min_polar_angle, mid_polar_angle, min_azimuth_angle, mid_azimuth_angle, min_p_min_a_in_painting, min_p_mid_a_in_painting, mid_p_min_a_in_painting, mid_p_mid_a_in_painting);
+			}
 			else
 				GenerateData(min_polar_angle, mid_polar_angle, min_azimuth_angle, mid_azimuth_angle, min_p_min_a_in_painting, min_p_mid_a_in_painting, mid_p_min_a_in_painting, mid_p_mid_a_in_painting);
 		low_p_low_a_zone = false;
@@ -223,8 +254,15 @@ void DataGenerator::GenerateData(qreal min_polar_angle, qreal max_polar_angle, q
 	{
 		if ((min_p_mid_a_in_painting || min_p_max_a_in_painting || mid_p_mid_a_in_painting || mid_p_max_a_in_painting)
 			&& (!float_equal(mid_polar_angle - min_polar_angle, M_PI / 500 / edge_segments) || !float_equal(max_azimuth_angle - mid_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + min_polar_angle) / 2))))
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(min_polar_angle, mid_polar_angle, mid_azimuth_angle, max_azimuth_angle, min_p_mid_a_in_painting, min_p_max_a_in_painting, mid_p_mid_a_in_painting, mid_p_max_a_in_painting); }));
+			if constexpr (parallel)
+			{
+				if (max_polar_angle - min_polar_angle > M_PI / 50)
+					Calculator::computePool->start([=]() {
+					GenerateData(min_polar_angle, mid_polar_angle, mid_azimuth_angle, max_azimuth_angle, min_p_mid_a_in_painting, min_p_max_a_in_painting, mid_p_mid_a_in_painting, mid_p_max_a_in_painting);
+						});
+				else
+					GenerateData(min_polar_angle, mid_polar_angle, mid_azimuth_angle, max_azimuth_angle, min_p_mid_a_in_painting, min_p_max_a_in_painting, mid_p_mid_a_in_painting, mid_p_max_a_in_painting);
+			}
 			else
 				GenerateData(min_polar_angle, mid_polar_angle, mid_azimuth_angle, max_azimuth_angle, min_p_mid_a_in_painting, min_p_max_a_in_painting, mid_p_mid_a_in_painting, mid_p_max_a_in_painting);
 		low_p_high_a_zone = false;
@@ -233,8 +271,15 @@ void DataGenerator::GenerateData(qreal min_polar_angle, qreal max_polar_angle, q
 	{
 		if ((mid_p_min_a_in_painting || mid_p_mid_a_in_painting || max_p_min_a_in_painting || max_p_mid_a_in_painting)
 			&& (!float_equal(max_polar_angle - mid_polar_angle, M_PI / 500 / edge_segments) || !float_equal(mid_azimuth_angle - min_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + max_polar_angle) / 2))))
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(mid_polar_angle, max_polar_angle, min_azimuth_angle, mid_azimuth_angle, mid_p_min_a_in_painting, mid_p_mid_a_in_painting, max_p_min_a_in_painting, max_p_mid_a_in_painting); }));
+			if constexpr (parallel)
+			{
+				if (max_polar_angle - min_polar_angle > M_PI / 50)
+					Calculator::computePool->start([=]() {
+					GenerateData(mid_polar_angle, max_polar_angle, min_azimuth_angle, mid_azimuth_angle, mid_p_min_a_in_painting, mid_p_mid_a_in_painting, max_p_min_a_in_painting, max_p_mid_a_in_painting);
+						});
+				else
+					GenerateData(mid_polar_angle, max_polar_angle, min_azimuth_angle, mid_azimuth_angle, mid_p_min_a_in_painting, mid_p_mid_a_in_painting, max_p_min_a_in_painting, max_p_mid_a_in_painting);
+			}
 			else
 				GenerateData(mid_polar_angle, max_polar_angle, min_azimuth_angle, mid_azimuth_angle, mid_p_min_a_in_painting, mid_p_mid_a_in_painting, max_p_min_a_in_painting, max_p_mid_a_in_painting);
 		high_p_low_a_zone = false;
@@ -243,8 +288,15 @@ void DataGenerator::GenerateData(qreal min_polar_angle, qreal max_polar_angle, q
 	{
 		if ((mid_p_mid_a_in_painting || mid_p_max_a_in_painting || max_p_mid_a_in_painting || max_p_max_a_in_painting)
 			&& (!float_equal(max_polar_angle - mid_polar_angle, M_PI / 500 / edge_segments) || !float_equal(max_azimuth_angle - mid_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + max_polar_angle) / 2))))
-			if (Calculator::thread_count > 1)
-				CreateAndStartRunnable(Calculator::computePool, &runnablePool, std::forward<std::function<void()>>([=]() { GenerateData(mid_polar_angle, max_polar_angle, mid_azimuth_angle, max_azimuth_angle, mid_p_mid_a_in_painting, mid_p_max_a_in_painting, max_p_mid_a_in_painting, max_p_max_a_in_painting); }));
+			if constexpr (parallel)
+			{
+				if (max_polar_angle - min_polar_angle > M_PI / 50)
+					Calculator::computePool->start([=]() {
+					GenerateData(mid_polar_angle, max_polar_angle, mid_azimuth_angle, max_azimuth_angle, mid_p_mid_a_in_painting, mid_p_max_a_in_painting, max_p_mid_a_in_painting, max_p_max_a_in_painting);
+						});
+				else
+					GenerateData(mid_polar_angle, max_polar_angle, mid_azimuth_angle, max_azimuth_angle, mid_p_mid_a_in_painting, mid_p_max_a_in_painting, max_p_mid_a_in_painting, max_p_max_a_in_painting);
+			}
 			else
 				GenerateData(mid_polar_angle, max_polar_angle, mid_azimuth_angle, max_azimuth_angle, mid_p_mid_a_in_painting, mid_p_max_a_in_painting, max_p_mid_a_in_painting, max_p_max_a_in_painting);
 		high_p_high_a_zone = false;
@@ -268,27 +320,27 @@ void DataGenerator::GenerateData(qreal min_polar_angle, qreal max_polar_angle, q
 	}
 }
 
-inline bool DataGenerator::point_is_in_painting(qreal theta, qreal phi)
+inline bool DataGeneratorBase::point_is_in_painting(qreal theta, qreal phi)
 {
 	return sin(container.polar_angle) * sin(theta) * cos(container.azimuth_angle - phi) + cos(container.polar_angle) * cos(theta) + 0.000000001 > cos(container.painting_central_angle / 2);
 }
 
-inline bool DataGenerator::float_equal(qreal lhs, qreal rhs)
+inline bool DataGeneratorBase::float_equal(qreal lhs, qreal rhs)
 {
 	return abs(lhs - rhs) < 0.000000001;
 }
 
-inline int DataGenerator::float_floor(qreal value)
+inline int DataGeneratorBase::float_floor(qreal value)
 {
 	return floor(value + 0.000000001);
 }
 
-inline qreal DataGenerator::get_nearest_multiple(qreal value, qreal multiple_base)
+inline qreal DataGeneratorBase::get_nearest_multiple(qreal value, qreal multiple_base)
 {
 	return multiple_base * round(value / multiple_base);
 }
 
-void DataGenerator::get_latitudinal_zone_range(int min_y, int max_y, int& min_l, int& max_l)
+inline void DataGeneratorBase::get_latitudinal_zone_range(int min_y, int max_y, int& min_l, int& max_l)
 {
 	if (min_y >= 250)
 	{
@@ -312,7 +364,7 @@ void DataGenerator::get_latitudinal_zone_range(int min_y, int max_y, int& min_l,
 		}
 }
 
-qreal DataGenerator::get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_polar_angle)
+inline qreal DataGeneratorBase::get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_polar_angle)
 {
 	int min_y = float_floor(min_polar_angle / M_PI * 500);
 	qreal temp_max_y = max_polar_angle / M_PI * 500;
@@ -330,7 +382,7 @@ qreal DataGenerator::get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_
 	return 2 * M_PI / edge_segments / gcd_of_latitudinal_zone[min_l][max_l];
 }
 
-qreal DataGenerator::get_minimal_azimuth_angle(qreal the_polar_angle)
+inline qreal DataGeneratorBase::get_minimal_azimuth_angle(qreal the_polar_angle)
 {
 	int y = float_floor(the_polar_angle / M_PI * 500);
 	if (y < 250)
@@ -340,7 +392,7 @@ qreal DataGenerator::get_minimal_azimuth_angle(qreal the_polar_angle)
 	return 2 * M_PI / edge_segments / (reformOffsets[y + 1] - reformOffsets[y]);
 }
 
-void DataGenerator::get_y_range(qreal min_polar_angle, qreal max_polar_angle, int& min_y, int& max_y, int& min_n, int& max_n)
+inline void DataGeneratorBase::get_y_range(qreal min_polar_angle, qreal max_polar_angle, int& min_y, int& max_y, int& min_n, int& max_n)
 {
 	min_y = float_floor(min_polar_angle / M_PI * 500);
 	qreal temp_max_y = max_polar_angle / M_PI * 500;
@@ -362,7 +414,7 @@ void DataGenerator::get_y_range(qreal min_polar_angle, qreal max_polar_angle, in
 		min_y = 249 - min_y;
 }
 
-void DataGenerator::get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle, int& latitude_length)
+inline void DataGeneratorBase::get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle, int& latitude_length)
 {
 	latitude_length = reformOffsets[y + 1] - reformOffsets[y];
 	minimal_azimuth_angle = 2 * M_PI / (latitude_length);
@@ -386,7 +438,8 @@ void DataGenerator::get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle
 		max_x = latitude_length * 1.5 - 1 - max_x;
 }
 
-void DataGenerator::init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
+template <bool parallel>
+inline void DataGenerator<parallel>::init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
 {
 	int min_l, max_l;
 	get_latitudinal_zone_range(min_y, max_y, min_l, max_l);
@@ -411,7 +464,8 @@ void DataGenerator::init_tile_zone(int min_y, int max_y, int min_n, int max_n, q
 		init_latitudinal_zone(min_y, max_y, min_n, max_n, min_azimuth_angle, max_azimuth_angle);
 }
 
-void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
+template <bool parallel>
+void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
 {
 	int min_x, max_x, min_m, max_m, latitude_length;
 	qreal minimal_azimuth_angle, minimal_polar_angle, min_polar_angle;
@@ -448,8 +502,12 @@ void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int m
 	int length_i = (max_y - min_y) * edge_segments + (max_n - min_n) * dir_y + 1;
 	int length_j = (max_x - min_x) * edge_segments + (max_m - min_m) * dir_x + 1;
 	int foundation_index;
-	uint index[4] = { 0, 0, 0, 0 };
-	uint start = raw_data_size.fetch_add(length_i * length_j);
+	uint index[4] = { 0, 0, 0, 0 }, points_start, raw_data_start;
+	if constexpr (parallel)
+	{
+		points_start = this->points_size.fetch_add((length_i + 1) * (length_j + 1));
+		raw_data_start = this->raw_data_size.fetch_add(length_i * length_j);
+	}
 	for (int i = 1; i <= length_i; i++)
 	{
 		for (int j = 1; j <= length_j; j++)
@@ -459,82 +517,131 @@ void DataGenerator::init_latitudinal_zone(int min_y, int max_y, int min_n, int m
 				if (j == 1)
 				{
 					QPointF point0(min_polar_angle, min_azimuth_angle);
-					index[0] = get_point_index(point0);
 					QPointF point1(min_polar_angle, min_azimuth_angle + minimal_azimuth_angle);
-					index[1] = get_point_index(point1);
 					QPointF point2(min_polar_angle + minimal_polar_angle, min_azimuth_angle);
-					index[2] = get_point_index(point2);
+					if constexpr (parallel)
+					{
+						index[0] = points_start;
+						points[index[0]] = point0;
+						index[1] = points_start + 1;
+						points[index[1]] = point1;
+						index[2] = points_start + length_j + 1;
+						points[index[2]] = point2;
+					}
+					else
+					{
+						index[0] = this->get_point_index(point0);
+						index[1] = this->get_point_index(point1);
+						index[2] = this->get_point_index(point2);
+					}
 				}
 				else
 				{
-					uint end_minus_one = start + (i - 1) * length_j + j - 2;
-					index[0] = raw_data[end_minus_one].point_index[1];
 					QPointF point1(min_polar_angle, min_azimuth_angle + minimal_azimuth_angle * j);
-					index[1] = get_point_index(point1);
-					index[2] = raw_data[end_minus_one].point_index[3];
+					if constexpr (parallel)
+					{
+						uint end_minus_one = raw_data_start + (i - 1) * length_j + j - 2;
+						index[0] = raw_data[end_minus_one].point_index[1];
+						index[1] = points_start + j;
+						points[index[1]] = point1;
+						index[2] = raw_data[end_minus_one].point_index[3];
+					}
+					else
+					{
+						index[0] = (*(raw_data.cend() - 1)).point_index[1];
+						index[1] = this->get_point_index(point1);
+						index[2] = (*(raw_data.cend() - 1)).point_index[3];
+					}
 				}
 			}
 			else
 			{
 				if (j == 1)
 				{
-					uint end_minus_length_j = start + (i - 2) * length_j + j - 1;
-					index[0] = raw_data[end_minus_length_j].point_index[2];
-					index[1] = raw_data[end_minus_length_j].point_index[3];
 					QPointF point2(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle);
-					index[2] = get_point_index(point2);
+					if constexpr (parallel)
+					{
+						uint end_minus_length_j = raw_data_start + (i - 2) * length_j + j - 1;
+						index[0] = raw_data[end_minus_length_j].point_index[2];
+						index[1] = raw_data[end_minus_length_j].point_index[3];
+						index[2] = points_start + i * (length_j + 1);
+						points[index[2]] = point2;
+					}
+					else
+					{
+						index[0] = (*(raw_data.cend() - length_j)).point_index[2];
+						index[1] = (*(raw_data.cend() - length_j)).point_index[3];
+						index[2] = this->get_point_index(point2);
+					}
 				}
 				else
 				{
-					uint end = start + (i - 1) * length_j + j - 1;
-					index[0] = raw_data[end - 1].point_index[1];
-					index[1] = raw_data[end - length_j].point_index[3];
-					index[2] = raw_data[end - 1].point_index[3];
+					if constexpr (parallel)
+					{
+						uint end = raw_data_start + (i - 1) * length_j + j - 1;
+						index[0] = raw_data[end - 1].point_index[1];
+						index[1] = raw_data[end - length_j].point_index[3];
+						index[2] = raw_data[end - 1].point_index[3];
+					}
+					else
+					{
+						index[0] = (*(raw_data.cend() - 1)).point_index[1];
+						index[1] = (*(raw_data.cend() - length_j)).point_index[3];
+						index[2] = (*(raw_data.cend() - 1)).point_index[3];
+					}
 				}
 			}
 			QPointF point3(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle + minimal_azimuth_angle * j);
-			if (i < length_i && j < length_j)
+			if constexpr (parallel)
 			{
-				QMutexLocker locker(&mutex);
-				index[3] = points.size();
-				points.push_back(point3);
+				index[3] = points_start + i * (length_j + 1) + j;
+				points[index[3]] = point3;
 			}
 			else
-				index[3] = get_point_index(point3);
+			{
+				if (i < length_i && j < length_j)
+				{
+					index[3] = points.size();
+					points.push_back(point3);
+				}
+				else
+					index[3] = this->get_point_index(point3);
+			}
 			foundation_index = reformOffsets[y + (i - 1 + n) / edge_segments * dir_y] + x + (j - 1 + m) / edge_segments * dir_x;
-			if (Calculator::thread_count > 1)
-				raw_data[start + (i - 1) * length_j + j - 1].setData(index, QPoint(foundation_index / 512 * edge_segments + (i - 1 + n) % edge_segments, foundation_index % 512 * edge_segments + (j - 1 + m) % edge_segments));
+			if constexpr (parallel)
+				raw_data[raw_data_start + (i - 1) * length_j + j - 1].setData(index, QPoint(foundation_index / 512 * edge_segments + (i - 1 + n) % edge_segments, foundation_index % 512 * edge_segments + (j - 1 + m) % edge_segments));
 			else
 				raw_data.emplace_back(index, QPoint(foundation_index / 512 * edge_segments + (i - 1 + n) % edge_segments, foundation_index % 512 * edge_segments + (j - 1 + m) % edge_segments));
 		}
 	}
 }
 
-uint DataGenerator::get_point_index(const QPointF& point)
+inline uint SingleThreadBase::get_point_index(const QPointF& point)
 {
 	uint index;
-	QMutexLocker locker(&mutex);
 	if (index_map.contains(point))
 		index = index_map.value(point);
 	else
 	{
-		index = points.size();
-		points.push_back(point);
+		index = static_cast<DataGenerator<false>*>(this)->points.size();
+		static_cast<DataGenerator<false>*>(this)->points.push_back(point);
 		index_map.insert(point, index);
 	}
 	return index;
 }
 
-void DataGenerator::ProcessData()
+template <bool parallel>
+void DataGenerator<parallel>::ProcessData()
 {
-	if (Calculator::thread_count > 1)
+	if constexpr (parallel)
 	{
 		int thread_count_minus_one = Calculator::thread_count - 1;
-		int batch_size = (points.size() + thread_count_minus_one - 1) / thread_count_minus_one;
+		// 多线程情况下，points.size()==10000000，必须使用points_size
+		int batch_size = (this->points_size + thread_count_minus_one - 1) / thread_count_minus_one;
 		for (int t = 0; t < thread_count_minus_one; ++t)
 		{
 			auto beg = points.begin() + t * batch_size;
-			auto end = (t == thread_count_minus_one - 1) ? points.end() : beg + batch_size;
+			auto end = (t == thread_count_minus_one - 1) ? points.begin() + this->points_size : beg + batch_size;
 			Calculator::computePool->start([this, beg, end]() {
 				for (auto it = beg; it != end; ++it)
 				{
@@ -544,14 +651,14 @@ void DataGenerator::ProcessData()
 				});
 		}
 		Calculator::computePool->start([this]() {
-			container.data.resize(raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
+			container.data.resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
 			});
 		Calculator::computePool->waitForDone();
-		batch_size = (raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;
+		batch_size = (this->raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;
 		for (int t = 0; t < Calculator::thread_count; ++t)
 		{
 			auto beg = raw_data.cbegin() + t * batch_size;
-			auto end = (t == Calculator::thread_count - 1) ? raw_data.cbegin() + raw_data_size : beg + batch_size;
+			auto end = (t == Calculator::thread_count - 1) ? raw_data.cbegin() + this->raw_data_size : beg + batch_size;
 			Calculator::computePool->start([this, beg, end, t, batch_size]() {
 				for (auto it = beg; it != end; ++it)
 				{
@@ -578,7 +685,7 @@ void DataGenerator::ProcessData()
 	}
 }
 
-QPointF DataGenerator::spherical_to_screen_uv(const QPointF& point)
+inline QPointF DataGeneratorBase::spherical_to_screen_uv(const QPointF& point)
 {
 	qreal i = sin(point.x()) * sin(point.y() - container.azimuth_angle);
 	qreal j = -sin(point.x()) * cos(container.polar_angle) * cos(point.y() - container.azimuth_angle) + cos(point.x()) * sin(container.polar_angle);
@@ -586,3 +693,6 @@ QPointF DataGenerator::spherical_to_screen_uv(const QPointF& point)
 	qreal temp = (1 - k * cos(container.painting_central_angle / 2)) * 2 / sin(container.painting_central_angle / 2);
 	return QPointF(0.5 + i / temp, 0.5 + j / temp);
 }
+
+template class DataGenerator<true>;
+template class DataGenerator<false>;

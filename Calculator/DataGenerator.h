@@ -1,8 +1,6 @@
 ﻿#pragma once
 #include "DataContainer.h"
-#include "RunnablePool.h"
 #include <QHash>
-#include <QMutex>
 
 namespace std {
 	template<>
@@ -17,7 +15,8 @@ namespace std {
 
 class TileRawData
 {
-	friend DataGenerator;
+	template <bool>
+	friend class DataGenerator;
 public:
 	TileRawData(uint index[], const QPoint& pos) :texture_pos(pos)
 	{
@@ -33,39 +32,40 @@ private:
 	}
 };
 
-class DataGenerator
+class ParallelBase
 {
-public:
-	DataGenerator(DataContainer& container);
-	~DataGenerator() = default;
+protected:
+	std::atomic<uint> points_size = 0, raw_data_size = 0;
+};
 
-private:
-	DataContainer& container;
+class SingleThreadBase
+{
+protected:
 	QHash<QPointF, uint> index_map;
+	uint get_point_index(const QPointF& point);
+};
+
+class DataGeneratorBase
+{
+	friend SingleThreadBase;
+public:
+	DataGeneratorBase(DataContainer& container) :container(container) {}
+
+protected:
+	DataContainer& container;
 	std::vector<QPointF> points;
 	std::vector<TileRawData, no_init_allocator<TileRawData>> raw_data;
-	std::atomic<uint> raw_data_size = 0;
-	QMutex mutex; // 保护index_map和points的互斥锁
-	RunnablePool<std::function<void()>> runnablePool;
 
-	void GenerateData();
-	// 参数表示的区域有且仅有部分地基在图片范围内，四个bool类型参数表示四个定点调用point_is_in_painting的返回值
-	void GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting);
-	inline bool point_is_in_painting(qreal theta, qreal phi);
-	inline bool float_equal(qreal lhs, qreal rhs);
-	inline int float_floor(qreal value);
-	inline qreal get_nearest_multiple(qreal value, qreal multiple_base); // multiple_base是倍数的基数
+	bool point_is_in_painting(qreal theta, qreal phi);
+	bool float_equal(qreal lhs, qreal rhs);
+	int float_floor(qreal value);
+	qreal get_nearest_multiple(qreal value, qreal multiple_base); // multiple_base是倍数的基数
 	void get_latitudinal_zone_range(int min_y, int max_y, int& min_l, int& max_l);
 	qreal get_minimal_azimuth_angle(qreal min_polar_angle, qreal max_polar_angle);
 	qreal get_minimal_azimuth_angle(qreal the_polar_angle);
 	// min/max_m/n是min/max_x/y对应的地基内瓦片的局部坐标，min_m/n可能大于max_m/n
 	void get_y_range(qreal min_polar_angle, qreal max_polar_angle, int& min_y, int& max_y, int& min_n, int& max_n);
 	void get_x_range(qreal min_azimuth_angle, qreal max_azimuth_angle, int y, int& min_x, int& max_x, int& min_m, int& max_m, qreal& minimal_azimuth_angle, int& latitude_length);
-	void init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
-	void init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
-	uint get_point_index(const QPointF& point);
-
-	void ProcessData();
 	QPointF spherical_to_screen_uv(const QPointF& point);
 
 	static constexpr int edge_segments = 8; // 每块地基划分为8*8=64块瓦片
@@ -591,4 +591,20 @@ private:
 		325580,
 		325600
 	};
+};
+
+template <bool parallel>
+class DataGenerator : public DataGeneratorBase, public std::conditional_t<parallel, ParallelBase, SingleThreadBase>
+{
+public:
+	DataGenerator(DataContainer& container);
+
+private:
+	void GenerateData();
+	// 参数表示的区域有且仅有部分地基在图片范围内，四个bool类型参数表示四个定点调用point_is_in_painting的返回值
+	void GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting);
+	void init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
+	void init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle);
+
+	void ProcessData();
 };

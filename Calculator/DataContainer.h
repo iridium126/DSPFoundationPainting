@@ -34,12 +34,14 @@ public:
 	}
 };
 
+template <bool parallel>
 class DataGenerator;
 class DataAccessor;
 
 class TileData
 {
-	friend DataGenerator;
+	template <bool>
+	friend class DataGenerator;
 	friend DataAccessor;
 public:
 	TileData(const QPointF& uv, const QPoint& pos)
@@ -78,7 +80,8 @@ private:
 
 class DataContainer
 {
-	friend DataGenerator;
+	template <bool>
+	friend class DataGenerator;
 	friend DataAccessor;
 public:
 	DataContainer(qreal polar_angle, qreal azimuth_angle, qreal painting_central_angle);
