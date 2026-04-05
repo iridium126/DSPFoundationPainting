@@ -82,7 +82,8 @@ class DataContainer
 {
 	template <bool>
 	friend class DataGenerator;
-	friend DataAccessor;
+	friend class DataAccessor;
+	friend class GPUAccelerator;
 public:
 	DataContainer(qreal polar_angle, qreal azimuth_angle, qreal painting_central_angle);
 	~DataContainer() = default;

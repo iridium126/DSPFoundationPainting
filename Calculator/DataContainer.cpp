@@ -11,7 +11,8 @@ DataContainer::DataContainer(qreal polar_angle, qreal azimuth_angle, qreal paint
 			DataGenerator<true> generator(*this);
 		else
 			DataGenerator<false> generator(*this);
-		Save();
+		if (Calculator::saveIntermediate)
+			Save();
 	}
 }
 

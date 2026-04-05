@@ -4,11 +4,12 @@
 template <bool parallel>
 DataGenerator<parallel>::DataGenerator(DataContainer& container) :DataGeneratorBase(container)
 {
-	// 经测试，并行分配内存收益不及线程调度开销
 	if constexpr (parallel)
 	{
+		Calculator::computePool->start([this]() {
+			raw_data.resize(10000000); });
 		points.resize(10000000);
-		raw_data.resize(10000000);
+		Calculator::computePool->waitForDone();
 	}
 	else
 	{
@@ -144,7 +145,7 @@ void DataGenerator<parallel>::GenerateData()
 		if (high_p_4_a_zone)
 			init_tile_zone(min_y, max_y, min_n, max_n, M_PI_2 * 3, M_PI * 2);
 	}
-	if (Calculator::thread_count > 1)
+	if constexpr (parallel)
 		Calculator::computePool->waitForDone();
 }
 
@@ -633,54 +634,61 @@ inline uint SingleThreadBase::get_point_index(const QPointF& point)
 template <bool parallel>
 void DataGenerator<parallel>::ProcessData()
 {
-	if constexpr (parallel)
+	/*if (Calculator::useGPU)
 	{
-		int thread_count_minus_one = Calculator::thread_count - 1;
-		// 多线程情况下，points.size()==10000000，必须使用points_size
-		int batch_size = (this->points_size + thread_count_minus_one - 1) / thread_count_minus_one;
-		for (int t = 0; t < thread_count_minus_one; ++t)
-		{
-			auto beg = points.begin() + t * batch_size;
-			auto end = (t == thread_count_minus_one - 1) ? points.begin() + this->points_size : beg + batch_size;
-			Calculator::computePool->start([this, beg, end]() {
-				for (auto it = beg; it != end; ++it)
-				{
-					auto& point = *it;
-					point = spherical_to_screen_uv(point);
-				}
-				});
-		}
-		Calculator::computePool->start([this]() {
-			container.data.resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
-			});
-		Calculator::computePool->waitForDone();
-		batch_size = (this->raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;
-		for (int t = 0; t < Calculator::thread_count; ++t)
-		{
-			auto beg = raw_data.cbegin() + t * batch_size;
-			auto end = (t == Calculator::thread_count - 1) ? raw_data.cbegin() + this->raw_data_size : beg + batch_size;
-			Calculator::computePool->start([this, beg, end, t, batch_size]() {
-				for (auto it = beg; it != end; ++it)
-				{
-					auto& tile = *it;
-					auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
-					auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
-					container.data[t * batch_size + (it - beg)].setData(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
-				}
-				});
-		}
-		Calculator::computePool->waitForDone();
+
 	}
-	else
+	else*/
 	{
-		container.data.reserve(raw_data.size());
-		for (auto& point : points)
-			point = spherical_to_screen_uv(point);
-		for (auto& tile : raw_data)
+		if constexpr (parallel)
 		{
-			auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
-			auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
-			container.data.emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+			int thread_count_minus_one = Calculator::thread_count - 1;
+			// 多线程情况下，points.size()==10000000，必须使用points_size
+			int batch_size = (this->points_size + thread_count_minus_one - 1) / thread_count_minus_one;
+			for (int t = 0; t < thread_count_minus_one; ++t)
+			{
+				auto beg = points.begin() + t * batch_size;
+				auto end = (t == thread_count_minus_one - 1) ? points.begin() + this->points_size : beg + batch_size;
+				Calculator::computePool->start([this, beg, end]() {
+					for (auto it = beg; it != end; ++it)
+					{
+						auto& point = *it;
+						point = spherical_to_screen_uv(point);
+					}
+					});
+			}
+			Calculator::computePool->start([this]() {
+				container.data.resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
+				});
+			Calculator::computePool->waitForDone();
+			batch_size = (this->raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;
+			for (int t = 0; t < Calculator::thread_count; ++t)
+			{
+				auto beg = raw_data.cbegin() + t * batch_size;
+				auto end = (t == Calculator::thread_count - 1) ? raw_data.cbegin() + this->raw_data_size : beg + batch_size;
+				Calculator::computePool->start([this, beg, end, t, batch_size]() {
+					for (auto it = beg; it != end; ++it)
+					{
+						auto& tile = *it;
+						auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
+						auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
+						container.data[t * batch_size + (it - beg)].setData(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+					}
+					});
+			}
+			Calculator::computePool->waitForDone();
+		}
+		else
+		{
+			container.data.reserve(raw_data.size());
+			for (auto& point : points)
+				point = spherical_to_screen_uv(point);
+			for (auto& tile : raw_data)
+			{
+				auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
+				auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
+				container.data.emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+			}
 		}
 	}
 }

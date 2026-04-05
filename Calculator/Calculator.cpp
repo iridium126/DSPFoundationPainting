@@ -2,6 +2,8 @@
 
 int Calculator::thread_count = QThread::idealThreadCount() - 1;
 QThreadPool* Calculator::computePool = nullptr;
+bool Calculator::useGPU = true;
+bool Calculator::saveIntermediate = false;
 
 Calculator::Calculator(QWidget* parent)
 	: QMainWindow(parent)
@@ -152,6 +154,7 @@ Calculator::Calculator(QWidget* parent)
 	threadSlider->setSingleStep(1);
 	threadEdit->setValidator(new QIntValidator(MIN_THREAD, MAX_THREAD, this));
 
+	threadLayout->addWidget(threadLabel);
 	threadLayout->addWidget(threadSlider, 3);
 	threadLayout->addWidget(threadEdit, 1);
 	threadLayout->setSpacing(15);
@@ -169,8 +172,28 @@ Calculator::Calculator(QWidget* parent)
 		}
 		});
 
-	vMainLayout->addWidget(threadLabel);
 	vMainLayout->addLayout(threadLayout);
+
+	// 复选框布局
+	QHBoxLayout* checkBoxLayout = new QHBoxLayout();
+	QCheckBox* gpuCheckBox = new QCheckBox(tr("使用GPU加速"), this);
+	QCheckBox* saveCheckBox = new QCheckBox(tr("保存中间数据"), this);
+
+	gpuCheckBox->setChecked(Calculator::useGPU);
+	saveCheckBox->setChecked(Calculator::saveIntermediate);
+
+	checkBoxLayout->addWidget(gpuCheckBox);
+	checkBoxLayout->addWidget(saveCheckBox);
+	checkBoxLayout->setSpacing(30);
+
+	connect(gpuCheckBox, &QCheckBox::toggled, this, [](bool checked) {
+		Calculator::useGPU = checked;
+		});
+	connect(saveCheckBox, &QCheckBox::toggled, this, [](bool checked) {
+		Calculator::saveIntermediate = checked;
+		});
+
+	vMainLayout->addLayout(checkBoxLayout);
 }
 
 Calculator::~Calculator()

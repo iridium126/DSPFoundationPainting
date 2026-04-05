@@ -53,7 +53,7 @@ public:
 
 protected:
 	DataContainer& container;
-	std::vector<QPointF> points;
+	std::vector<QPointF, no_init_allocator<QPointF>> points;
 	std::vector<TileRawData, no_init_allocator<TileRawData>> raw_data;
 
 	bool point_is_in_painting(qreal theta, qreal phi);

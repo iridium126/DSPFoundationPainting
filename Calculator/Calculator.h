@@ -11,6 +11,7 @@
 #include <QRegularExpressionValidator>
 #include <QPushButton>
 #include <QFileDialog>
+#include <QCheckBox>
 
 class Calculator : public QMainWindow
 {
@@ -21,6 +22,8 @@ public:
 	~Calculator();
 	static int thread_count;
 	static QThreadPool* computePool;
+	static bool useGPU;
+	static bool saveIntermediate;
 
 private:
 	Ui::CalculatorClass ui;
