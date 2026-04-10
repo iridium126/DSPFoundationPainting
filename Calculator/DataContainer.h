@@ -48,6 +48,7 @@ public:
 	{
 		setData(uv, pos);
 	}
+	TileData(const uint64_t packed) : packed_data(packed) {}
 private:
 	uint64_t packed_data; // 将uv坐标和纹理坐标打包成一个64位整数，节省空间
 	static constexpr uint32_t FIXED_SCALE = (1 << 19) - 1;

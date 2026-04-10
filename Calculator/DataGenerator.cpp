@@ -1,5 +1,6 @@
 ﻿#include "DataGenerator.h"
 #include "Calculator.h"
+#include "GPUAccelerator.h"
 
 template <bool parallel>
 DataGenerator<parallel>::DataGenerator(DataContainer& container) :DataGeneratorBase(container)
@@ -634,11 +635,16 @@ inline uint SingleThreadBase::get_point_index(const QPointF& point)
 template <bool parallel>
 void DataGenerator<parallel>::ProcessData()
 {
-	/*if (Calculator::useGPU)
+	if (Calculator::useGPU)
 	{
-
+		if constexpr (parallel)
+		{
+			GPUAccelerator accelerator;
+			accelerator.initialize();
+			accelerator.compute(points, raw_data, this->points_size, this->raw_data_size, container);
+		}
 	}
-	else*/
+	else
 	{
 		if constexpr (parallel)
 		{

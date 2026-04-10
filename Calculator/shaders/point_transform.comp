@@ -1,0 +1,34 @@
+#version 450
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, binding = 0) buffer PointBuffer { vec2 points[]; };
+
+layout(std140, binding = 3) uniform UniformBlock {
+    uint pointCount;
+    uint tileCount;
+    float polar_angle;
+    float azimuth_angle;
+    float painting_central_angle;
+} ubo;
+
+void main() {
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid >= ubo.pointCount) return;
+
+    vec2 p = points[gid];
+    float sin_px = sin(p.x);
+    float cos_px = cos(p.x);
+    float y_az = p.y - ubo.azimuth_angle;
+    float sin_yaz = sin(y_az);
+    float cos_yaz = cos(y_az);
+    float cos_p = cos(ubo.polar_angle);
+    float sin_p = sin(ubo.polar_angle);
+
+    float i = sin_px * sin_yaz;
+    float j = -sin_px * cos_p * cos_yaz + cos_px * sin_p;
+    float k = sin_px * sin_p * cos_yaz + cos_px * cos_p;
+
+    float half_angle = ubo.painting_central_angle * 0.5;
+    float temp = (1.0 - k * cos(half_angle)) * 2.0 / sin(half_angle);
+    points[gid] = vec2(0.5 + i / temp, 0.5 + j / temp);
+}

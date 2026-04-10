@@ -1,4 +1,6 @@
 <RCC>
-    <qresource prefix="Calculator">
+    <qresource prefix="/shaders">
+        <file>shaders/point_transform.qsb</file>
+        <file>shaders/tile_pack.qsb</file>
     </qresource>
 </RCC>

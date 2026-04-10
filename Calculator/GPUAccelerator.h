@@ -1,30 +1,45 @@
 #pragma once
-#include <QOpenGLBuffer>
-#include <QOpenGLShaderProgram>
-#include <QOpenGLFunctions_4_3_Core>
-#include <vector>
+#include <rhi/qrhi.h>
+#include <QResource>
 #include "DataGenerator.h"
 
-class GPUAccelerator {
+// Qt6 Rhi 计算着色器加速类
+class GPUAccelerator
+{
 public:
-	GPUAccelerator();
+	GPUAccelerator() = default;
 	~GPUAccelerator();
 
 	// 禁止拷贝
 	GPUAccelerator(const GPUAccelerator&) = delete;
 	GPUAccelerator& operator=(const GPUAccelerator&) = delete;
 
-	// 执行计算，将结果填充至 container.data 中
-	// 返回值：是否成功
-	bool compute(const std::vector<QPointF>& points, const std::vector<TileRawData>& raw_data,
-		const uint points_size, const uint raw_data_size, DataContainer& container);
+	// 初始化
+	bool initialize();
+
+	// 核心计算接口
+	bool compute(const std::vector<QPointF, no_init_allocator<QPointF>>& points,
+		const std::vector<TileRawData, no_init_allocator<TileRawData>>& raw_data,
+		const uint points_size,
+		const uint raw_data_size,
+		DataContainer& container);
+
+	// 释放资源
+	void destroy();
 
 private:
-	QOpenGLFunctions_4_3_Core* f = nullptr;
-	QOpenGLShaderProgram program;
-	QOpenGLBuffer pointBuffer;   // SSBO 0
-	QOpenGLBuffer tileBuffer;    // SSBO 1
-	QOpenGLBuffer outputBuffer;  // SSBO 2
+	QRhi* rhi = nullptr;
 
-	bool initShaders();
+	// 缓冲区
+	QRhiBuffer* pointBuf = nullptr;
+	QRhiBuffer* tileBuf = nullptr;
+	QRhiBuffer* outputBuf = nullptr;
+	QRhiBuffer* uniformBuf = nullptr;
+
+	// 资源绑定
+	QRhiShaderResourceBindings* srb = nullptr;
+
+	// 计算管线
+	QRhiComputePipeline* pointPipeline = nullptr;  // 点变换
+	QRhiComputePipeline* tilePipeline = nullptr;   // 瓦片打包
 };

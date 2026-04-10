@@ -1,171 +1,143 @@
 #include "GPUAccelerator.h"
 
-static const char* computeShaderSource = R"(
-#version 430 core
-#extension GL_ARB_gpu_shader_int64 : enable
-
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-
-struct TileRaw {
-    uint index[4];
-    ivec2 texPos;
-};
-
-// 输入：原始点数据
-layout(std430, binding = 0) buffer PointBuffer {
-    vec2 points[];
-};
-
-// 输入：瓦片数据
-layout(std430, binding = 1) buffer TileBuffer {
-    TileRaw tiles[];
-};
-
-// 输出：打包后的数据
-layout(std430, binding = 2) buffer OutputBuffer {
-    uint64_t outputData[];
-};
-
-uniform float polar_angle;
-uniform float azimuth_angle;
-uniform float painting_central_angle;
-
-const uint FIXED_SCALE = 0x7FFFFu; // (1 << 19) - 1
-
-void main() {
-    // 全局线程ID（同时作为点索引/瓦片索引）
-    uint globalId = gl_GlobalInvocationID.x;
-
-    if (globalId < points.length()) {
-        vec2 point = points[globalId];
-        float i = sin(point.x) * sin(point.y - azimuth_angle);
-        float j = -sin(point.x) * cos(polar_angle) * cos(point.y - azimuth_angle) + cos(point.x) * sin(polar_angle);
-        float k = sin(point.x) * sin(polar_angle) * cos(point.y - azimuth_angle) + cos(point.x) * cos(polar_angle);
-        float temp = (1.0 - k * cos(painting_central_angle / 2.0)) * 2.0 / sin(painting_central_angle / 2.0);
-        points[globalId] = vec2(0.5 + i / temp, 0.5 + j / temp);
-    }
-
-    memoryBarrierBuffer();
-    barrier();
-
-    if (globalId >= tiles.length()) return;
-    
-    TileRaw tile = tiles[globalId];
-    float u_min = 1.0, u_max = 0.0;
-    float v_min = 1.0, v_max = 0.0;
-
-    for (int i = 0; i < 4; ++i) {
-        uint idx = tile.index[i];
-        vec2 uv = points[idx];
-        u_min = min(u_min, uv.x);
-        u_max = max(u_max, uv.x);
-        v_min = min(v_min, uv.y);
-        v_max = max(v_max, uv.y);
-    }
-
-    float u_center = (u_min + u_max) * 0.5;
-    float v_center = (v_min + v_max) * 0.5;
-    
-    uint u_fixed = uint(u_center * float(FIXED_SCALE));
-    uint v_fixed = uint(v_center * float(FIXED_SCALE));
-    uint64_t packed = (uint64_t(u_fixed) << 45u) |
-                      (uint64_t(tile.texPos.x) << 32u) |
-                      (uint64_t(v_fixed) << 13u) |
-                      uint64_t(tile.texPos.y);
-    outputData[globalId] = packed;
-}
-)";
-
-GPUAccelerator::GPUAccelerator()
-{
-	f = new QOpenGLFunctions_4_3_Core;
-	// 绑定当前OpenGL上下文（必须有有效上下文才能调用）
-	if (!f->initializeOpenGLFunctions()) {
-		qCritical() << "OpenGL 4.3 初始化失败！请检查显卡支持";
-	}
-}
-
 GPUAccelerator::~GPUAccelerator()
 {
-	// 注意：销毁时需保证 OpenGL 上下文仍然有效
-	pointBuffer.destroy();
-	tileBuffer.destroy();
-	outputBuffer.destroy();
-	// QOpenGLShaderProgram 的析构会自动释放着色器资源
-	delete f;
+	destroy();
 }
 
-bool GPUAccelerator::initShaders()
+bool GPUAccelerator::initialize()
 {
-	if (!program.addShaderFromSourceCode(QOpenGLShader::Compute, computeShaderSource)) {
-		qWarning() << "Compute shader compilation failed:" << program.log();
+	QRhiD3D12InitParams params;
+	rhi = QRhi::create(QRhi::D3D12, &params);
+
+	// 创建缓冲区对象
+	pointBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(QPointF));
+	tileBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(TileRawData));
+	outputBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(uint64_t));
+	uniformBuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 20);
+	pointBuf->create();
+	tileBuf->create();
+	outputBuf->create();
+	uniformBuf->create();
+
+	// 创建资源绑定布局
+	srb = rhi->newShaderResourceBindings();
+	srb->setBindings({
+		QRhiShaderResourceBinding::bufferStore(0, QRhiShaderResourceBinding::ComputeStage, pointBuf),
+		QRhiShaderResourceBinding::bufferStore(1, QRhiShaderResourceBinding::ComputeStage, tileBuf),
+		QRhiShaderResourceBinding::bufferLoad(2, QRhiShaderResourceBinding::ComputeStage, outputBuf),
+		QRhiShaderResourceBinding::uniformBuffer(3, QRhiShaderResourceBinding::ComputeStage, uniformBuf)
+		});
+	srb->create();
+
+	// 加载离线编译的着色器（.qsb）
+	auto loadShader = [this](const QString& path) -> QShader {
+		QResource resource(path);
+		if (!resource.isValid() || !resource.data())
+			return {};
+		return QShader::fromSerialized(QByteArray(reinterpret_cast<const char*>(resource.data()), resource.size()));
+		};
+	QShader pointShader = loadShader(":/shaders/shaders/point_transform.qsb");
+	QShader tileShader = loadShader(":/shaders/shaders/tile_pack.qsb");
+
+	if (!pointShader.isValid() || !tileShader.isValid()) {
+		qCritical() << "着色器加载失败！";
 		return false;
 	}
-	if (!program.link()) {
-		qWarning() << "Shader linking failed:" << program.log();
-		return false;
-	}
+
+	// 创建计算管线
+	// 管线1：点坐标变换
+	pointPipeline = rhi->newComputePipeline();
+	pointPipeline->setShaderResourceBindings(srb);
+	pointPipeline->setShaderStage({ QRhiShaderStage::Compute, pointShader });
+	pointPipeline->create();
+
+	// 管线2：瓦片打包
+	tilePipeline = rhi->newComputePipeline();
+	tilePipeline->setShaderResourceBindings(srb);
+	tilePipeline->setShaderStage({ QRhiShaderStage::Compute, tileShader });
+	tilePipeline->create();
+
 	return true;
 }
 
-bool GPUAccelerator::compute(const std::vector<QPointF>& points, const std::vector<TileRawData>& raw_data,
-	const uint points_size, const uint raw_data_size, DataContainer& container)
+bool GPUAccelerator::compute(const std::vector<QPointF, no_init_allocator<QPointF>>& points,
+	const std::vector<TileRawData, no_init_allocator<TileRawData>>& raw_data,
+	const uint points_size,
+	const uint raw_data_size,
+	DataContainer& container)
 {
-	// 创建 SSBO
-	pointBuffer.create();
-	pointBuffer.bind();
-	pointBuffer.allocate(points.data(), points_size * sizeof(QPointF));
-	pointBuffer.release();
+	const qint64 pointBytes = points_size * sizeof(QPointF);
+	const qint64 tileBytes = raw_data_size * sizeof(TileRawData);
+	const qint64 outBytes = raw_data_size * sizeof(uint64_t);
 
-	tileBuffer.create();
-	tileBuffer.bind();
-	tileBuffer.allocate(raw_data.data(), raw_data_size * sizeof(TileRawData));
-	tileBuffer.release();
+	struct UniformData {
+		uint points_size;
+		uint raw_data_size;
+		float polar_angle;
+		float azimuth_angle;
+		float painting_central_angle;
+	} uniformData{ points_size, raw_data_size,
+		static_cast<float>(container.polar_angle),
+		static_cast<float>(container.azimuth_angle),
+		static_cast<float>(container.painting_central_angle) };
 
-	outputBuffer.create();
-	outputBuffer.bind();
-	outputBuffer.allocate(raw_data_size * sizeof(uint64_t));
-	outputBuffer.release();
+	// 创建资源更新批处理
+	QRhiResourceUpdateBatch* batch = rhi->nextResourceUpdateBatch();
 
-	if (!initShaders()) {
-		qFatal("GPUAccelerator: Shader initialization failed");
-	}
+	// 上传数据
+	batch->updateDynamicBuffer(pointBuf, 0, pointBytes, points.data());
+	batch->updateDynamicBuffer(tileBuf, 0, tileBytes, raw_data.data());
+	batch->updateDynamicBuffer(uniformBuf, 0, sizeof(UniformData), &uniformData);
 
-	program.bind();
+	QRhiCommandBuffer* cb = nullptr;
+	rhi->beginOffscreenFrame(&cb);
+	// 提交上传
+	cb->beginComputePass(batch);
 
-	// 绑定 SSBO
-	pointBuffer.bind();
-	f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, pointBuffer.bufferId());
-	tileBuffer.bind();
-	f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, tileBuffer.bufferId());
-	outputBuffer.bind();
-	f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, outputBuffer.bufferId());
+	// 阶段1：点坐标变换
+	cb->setComputePipeline(pointPipeline);
+	cb->setShaderResources(srb);
 
-	// 设置角度参数
-	program.setUniformValue("polar_angle", static_cast<GLfloat>(container.polar_angle));
-	program.setUniformValue("azimuth_angle", static_cast<GLfloat>(container.azimuth_angle));
-	program.setUniformValue("painting_central_angle", static_cast<GLfloat>(container.painting_central_angle));
+	cb->dispatch((points_size + 255) / 256, 1, 1);
+	// 内存屏障：保证点数据写入完成
+	cb->endComputePass();
+	cb->beginComputePass();
 
-	// 调度计算
-	uint workGroups = (raw_data_size + 255) / 256;
-	f->glDispatchCompute(workGroups, 1, 1);
-	f->glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+	// 阶段2：瓦片打包
+	cb->setComputePipeline(tilePipeline);
+	cb->dispatch((raw_data_size + 255) / 256, 1, 1);
+
+	QRhiReadbackResult readbackResult;
+	batch = rhi->nextResourceUpdateBatch();
+	batch->readBackBuffer(outputBuf, 0, outBytes, &readbackResult);
+	cb->endComputePass(batch); // 传入读回批次，确保计算完成后读回
+
+	// 结束离屏帧，同步等待计算完成
+	rhi->endOffscreenFrame();
 
 	// 读回结果
-	outputBuffer.bind();
-	void* ptr = f->glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
-		raw_data_size * sizeof(uint64_t),
-		GL_MAP_READ_BIT);
-	if (!ptr) {
-		qWarning() << "GPUAccelerator::compute: Failed to map output buffer";
-		program.release();
-		return false;
-	}
-	container.data.resize(raw_data_size);
-	memcpy(container.data.data(), ptr, raw_data_size * sizeof(uint64_t));
-	f->glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-	outputBuffer.release();
 
-	program.release();
+	const QByteArray& readbackData = readbackResult.data;
+
+	// 直接构造（最高效，无多余拷贝）
+	container.data.assign(reinterpret_cast<const uint64_t*>(readbackData.constData()),
+		reinterpret_cast<const uint64_t*>(readbackData.constData() + readbackData.size()));
+
+
 	return true;
+}
+
+void GPUAccelerator::destroy()
+{
+	if (!rhi) return;
+
+	delete pointPipeline;
+	delete tilePipeline;
+	delete srb;
+	delete pointBuf;
+	delete tileBuf;
+	delete outputBuf;
+	delete uniformBuf;
+	delete rhi;
 }

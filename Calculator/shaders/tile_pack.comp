@@ -1,0 +1,46 @@
+#version 450
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+struct TileRaw {
+    uint index[4];
+    ivec2 texPos;
+};
+
+layout(std430, binding = 0) buffer PointBuffer { vec2 points[]; };
+layout(std430, binding = 1) buffer TileBuffer  { TileRaw tiles[]; };
+layout(std430, binding = 2) buffer OutputBuffer { uvec2 packed[]; };
+
+layout(std140, binding = 3) uniform UniformBlock {
+    uint pointCount;
+    uint tileCount;
+    float polar_angle;
+    float azimuth_angle;
+    float painting_central_angle;
+} ubo;
+
+const uint FIXED_SCALE = 0x7FFFFu;
+
+void main() {
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid >= ubo.tileCount) return;
+
+    TileRaw tile = tiles[gid];
+    float u_min=1, u_max=0, v_min=1, v_max=0;
+    for (int i=0; i<4; i++) {
+        vec2 uv = points[tile.index[i]];
+        u_min = min(u_min, uv.x);
+        u_max = max(u_max, uv.x);
+        v_min = min(v_min, uv.y);
+        v_max = max(v_max, uv.y);
+    }
+
+    float u = (u_min+u_max)*0.5;
+    float v = (v_min+v_max)*0.5;
+    uint uf = uint(clamp(u,0,1)*FIXED_SCALE);
+    uint vf = uint(clamp(v,0,1)*FIXED_SCALE);
+
+    packed[gid] = uvec2(
+        (uf << 13) | (tile.texPos.x & 0x1FFF),
+        (vf << 13) | (tile.texPos.y & 0x1FFF)
+    );
+}
