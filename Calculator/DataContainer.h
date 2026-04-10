@@ -34,13 +34,36 @@ public:
 	}
 };
 
-template <bool parallel>
+// 位域枚举：执行模式标志（两个位：并行 / 使用GPU）
+enum class ComputeFlags : uint8_t
+{
+	None = 0,					// 00  无任何配置
+	Parallel = 1U << 0,         // 01  第0位：启用并行
+	GpuEnabled = 1U << 1,       // 10  第1位：启用GPU
+	All = Parallel | GpuEnabled // 11  全部开启
+};
+// 按位与 &：判断是否包含标志
+inline constexpr ComputeFlags operator&(ComputeFlags lhs, ComputeFlags rhs)
+{
+	return static_cast<ComputeFlags>(static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs));
+}
+// 按位或 |：组合标志
+inline constexpr ComputeFlags operator|(ComputeFlags lhs, ComputeFlags rhs)
+{
+	return static_cast<ComputeFlags>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+}
+// 判断是否启用标志
+inline constexpr bool has_flag(ComputeFlags flags, ComputeFlags target) {
+	return (flags & target) != ComputeFlags::None;
+}
+
+template <ComputeFlags computeFlag>
 class DataGenerator;
 class DataAccessor;
 
 class TileData
 {
-	template <bool>
+	template <ComputeFlags>
 	friend class DataGenerator;
 	friend DataAccessor;
 public:
@@ -81,7 +104,7 @@ private:
 
 class DataContainer
 {
-	template <bool>
+	template <ComputeFlags>
 	friend class DataGenerator;
 	friend class DataAccessor;
 	friend class GPUAccelerator;

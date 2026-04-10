@@ -2,10 +2,10 @@
 #include "Calculator.h"
 #include "GPUAccelerator.h"
 
-template <bool parallel>
-DataGenerator<parallel>::DataGenerator(DataContainer& container) :DataGeneratorBase(container)
+template <ComputeFlags computeFlag>
+DataGenerator<computeFlag>::DataGenerator(DataContainer& container) :DataGeneratorBase(container)
 {
-	if constexpr (parallel)
+	if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 	{
 		Calculator::computePool->start([this]() {
 			raw_data.resize(10000000); });
@@ -22,8 +22,8 @@ DataGenerator<parallel>::DataGenerator(DataContainer& container) :DataGeneratorB
 	ProcessData();
 }
 
-template <bool parallel>
-void DataGenerator<parallel>::GenerateData()
+template <ComputeFlags computeFlag>
+void DataGenerator<computeFlag>::GenerateData()
 {
 	bool p_0_in_painting, p_90_a_0_in_painting, p_90_a_90_in_painting, p_90_a_180_in_painting, p_90_a_270_in_painting, p_180_in_painting;
 	bool low_p_1_a_zone = true, low_p_2_a_zone = true, low_p_3_a_zone = true, low_p_4_a_zone = true, high_p_1_a_zone = true, high_p_2_a_zone = true, high_p_3_a_zone = true, high_p_4_a_zone = true;
@@ -36,7 +36,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_0_in_painting || !p_90_a_0_in_painting || !p_90_a_90_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_0_in_painting || p_90_a_90_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(0, M_PI_2, 0, M_PI_2, p_0_in_painting, p_0_in_painting, p_90_a_0_in_painting, p_90_a_90_in_painting);
 					});
@@ -47,7 +47,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_0_in_painting || !p_90_a_90_in_painting || !p_90_a_180_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_90_in_painting || p_90_a_180_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(0, M_PI_2, M_PI_2, M_PI, p_0_in_painting, p_0_in_painting, p_90_a_90_in_painting, p_90_a_180_in_painting);
 					});
@@ -58,7 +58,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_0_in_painting || !p_90_a_180_in_painting || !p_90_a_270_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_180_in_painting || p_90_a_270_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(0, M_PI_2, M_PI, M_PI_2 * 3, p_0_in_painting, p_0_in_painting, p_90_a_180_in_painting, p_90_a_270_in_painting);
 					});
@@ -69,7 +69,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_0_in_painting || !p_90_a_270_in_painting || !p_90_a_0_in_painting)
 	{
 		if (p_0_in_painting || p_90_a_270_in_painting || p_90_a_0_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(0, M_PI_2, M_PI_2 * 3, M_PI * 2, p_0_in_painting, p_0_in_painting, p_90_a_270_in_painting, p_90_a_0_in_painting);
 					});
@@ -80,7 +80,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_180_in_painting || !p_90_a_0_in_painting || !p_90_a_90_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_0_in_painting || p_90_a_90_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(M_PI_2, M_PI, 0, M_PI_2, p_90_a_0_in_painting, p_90_a_90_in_painting, p_180_in_painting, p_180_in_painting);
 					});
@@ -91,7 +91,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_180_in_painting || !p_90_a_90_in_painting || !p_90_a_180_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_90_in_painting || p_90_a_180_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(M_PI_2, M_PI, M_PI_2, M_PI, p_90_a_90_in_painting, p_90_a_180_in_painting, p_180_in_painting, p_180_in_painting);
 					});
@@ -102,7 +102,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_180_in_painting || !p_90_a_180_in_painting || !p_90_a_270_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_180_in_painting || p_90_a_270_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(M_PI_2, M_PI, M_PI, M_PI_2 * 3, p_90_a_180_in_painting, p_90_a_270_in_painting, p_180_in_painting, p_180_in_painting);
 					});
@@ -113,7 +113,7 @@ void DataGenerator<parallel>::GenerateData()
 	if (!p_180_in_painting || !p_90_a_270_in_painting || !p_90_a_0_in_painting)
 	{
 		if (p_180_in_painting || p_90_a_270_in_painting || p_90_a_0_in_painting)
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				Calculator::computePool->start([=]() {
 				GenerateData(M_PI_2, M_PI, M_PI_2 * 3, M_PI * 2, p_90_a_270_in_painting, p_90_a_0_in_painting, p_180_in_painting, p_180_in_painting);
 					});
@@ -146,12 +146,12 @@ void DataGenerator<parallel>::GenerateData()
 		if (high_p_4_a_zone)
 			init_tile_zone(min_y, max_y, min_n, max_n, M_PI_2 * 3, M_PI * 2);
 	}
-	if constexpr (parallel)
+	if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 		Calculator::computePool->waitForDone();
 }
 
-template <bool parallel>
-void DataGenerator<parallel>::GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting)
+template <ComputeFlags computeFlag>
+void DataGenerator<computeFlag>::GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting)
 {
 	qreal mid_polar_angle, mid_azimuth_angle;
 	mid_polar_angle = get_nearest_multiple((min_polar_angle + max_polar_angle) / 2, M_PI / 500 / edge_segments);
@@ -239,7 +239,7 @@ void DataGenerator<parallel>::GenerateData(qreal min_polar_angle, qreal max_pola
 	{
 		if ((min_p_min_a_in_painting || min_p_mid_a_in_painting || mid_p_min_a_in_painting || mid_p_mid_a_in_painting)
 			&& (!float_equal(mid_polar_angle - min_polar_angle, M_PI / 500 / edge_segments) || !float_equal(mid_azimuth_angle - min_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + min_polar_angle) / 2))))
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 			{
 				if (max_polar_angle - min_polar_angle > M_PI / 50)
 					Calculator::computePool->start([=]() {
@@ -256,7 +256,7 @@ void DataGenerator<parallel>::GenerateData(qreal min_polar_angle, qreal max_pola
 	{
 		if ((min_p_mid_a_in_painting || min_p_max_a_in_painting || mid_p_mid_a_in_painting || mid_p_max_a_in_painting)
 			&& (!float_equal(mid_polar_angle - min_polar_angle, M_PI / 500 / edge_segments) || !float_equal(max_azimuth_angle - mid_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + min_polar_angle) / 2))))
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 			{
 				if (max_polar_angle - min_polar_angle > M_PI / 50)
 					Calculator::computePool->start([=]() {
@@ -273,7 +273,7 @@ void DataGenerator<parallel>::GenerateData(qreal min_polar_angle, qreal max_pola
 	{
 		if ((mid_p_min_a_in_painting || mid_p_mid_a_in_painting || max_p_min_a_in_painting || max_p_mid_a_in_painting)
 			&& (!float_equal(max_polar_angle - mid_polar_angle, M_PI / 500 / edge_segments) || !float_equal(mid_azimuth_angle - min_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + max_polar_angle) / 2))))
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 			{
 				if (max_polar_angle - min_polar_angle > M_PI / 50)
 					Calculator::computePool->start([=]() {
@@ -290,7 +290,7 @@ void DataGenerator<parallel>::GenerateData(qreal min_polar_angle, qreal max_pola
 	{
 		if ((mid_p_mid_a_in_painting || mid_p_max_a_in_painting || max_p_mid_a_in_painting || max_p_max_a_in_painting)
 			&& (!float_equal(max_polar_angle - mid_polar_angle, M_PI / 500 / edge_segments) || !float_equal(max_azimuth_angle - mid_azimuth_angle, get_minimal_azimuth_angle((mid_polar_angle + max_polar_angle) / 2))))
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 			{
 				if (max_polar_angle - min_polar_angle > M_PI / 50)
 					Calculator::computePool->start([=]() {
@@ -440,8 +440,8 @@ inline void DataGeneratorBase::get_x_range(qreal min_azimuth_angle, qreal max_az
 		max_x = latitude_length * 1.5 - 1 - max_x;
 }
 
-template <bool parallel>
-inline void DataGenerator<parallel>::init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
+template <ComputeFlags computeFlag>
+inline void DataGenerator<computeFlag>::init_tile_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
 {
 	int min_l, max_l;
 	get_latitudinal_zone_range(min_y, max_y, min_l, max_l);
@@ -466,8 +466,8 @@ inline void DataGenerator<parallel>::init_tile_zone(int min_y, int max_y, int mi
 		init_latitudinal_zone(min_y, max_y, min_n, max_n, min_azimuth_angle, max_azimuth_angle);
 }
 
-template <bool parallel>
-void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
+template <ComputeFlags computeFlag>
+void DataGenerator<computeFlag>::init_latitudinal_zone(int min_y, int max_y, int min_n, int max_n, qreal min_azimuth_angle, qreal max_azimuth_angle)
 {
 	int min_x, max_x, min_m, max_m, latitude_length;
 	qreal minimal_azimuth_angle, minimal_polar_angle, min_polar_angle;
@@ -505,7 +505,7 @@ void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int mi
 	int length_j = (max_x - min_x) * edge_segments + (max_m - min_m) * dir_x + 1;
 	int foundation_index;
 	uint index[4] = { 0, 0, 0, 0 }, points_start, raw_data_start;
-	if constexpr (parallel)
+	if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 	{
 		points_start = this->points_size.fetch_add((length_i + 1) * (length_j + 1));
 		raw_data_start = this->raw_data_size.fetch_add(length_i * length_j);
@@ -521,7 +521,7 @@ void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int mi
 					QPointF point0(min_polar_angle, min_azimuth_angle);
 					QPointF point1(min_polar_angle, min_azimuth_angle + minimal_azimuth_angle);
 					QPointF point2(min_polar_angle + minimal_polar_angle, min_azimuth_angle);
-					if constexpr (parallel)
+					if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 					{
 						index[0] = points_start;
 						points[index[0]] = point0;
@@ -540,7 +540,7 @@ void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int mi
 				else
 				{
 					QPointF point1(min_polar_angle, min_azimuth_angle + minimal_azimuth_angle * j);
-					if constexpr (parallel)
+					if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 					{
 						uint end_minus_one = raw_data_start + (i - 1) * length_j + j - 2;
 						index[0] = raw_data[end_minus_one].point_index[1];
@@ -561,7 +561,7 @@ void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int mi
 				if (j == 1)
 				{
 					QPointF point2(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle);
-					if constexpr (parallel)
+					if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 					{
 						uint end_minus_length_j = raw_data_start + (i - 2) * length_j + j - 1;
 						index[0] = raw_data[end_minus_length_j].point_index[2];
@@ -578,7 +578,7 @@ void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int mi
 				}
 				else
 				{
-					if constexpr (parallel)
+					if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 					{
 						uint end = raw_data_start + (i - 1) * length_j + j - 1;
 						index[0] = raw_data[end - 1].point_index[1];
@@ -594,7 +594,7 @@ void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int mi
 				}
 			}
 			QPointF point3(min_polar_angle + minimal_polar_angle * i, min_azimuth_angle + minimal_azimuth_angle * j);
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 			{
 				index[3] = points_start + i * (length_j + 1) + j;
 				points[index[3]] = point3;
@@ -610,7 +610,7 @@ void DataGenerator<parallel>::init_latitudinal_zone(int min_y, int max_y, int mi
 					index[3] = this->get_point_index(point3);
 			}
 			foundation_index = reformOffsets[y + (i - 1 + n) / edge_segments * dir_y] + x + (j - 1 + m) / edge_segments * dir_x;
-			if constexpr (parallel)
+			if constexpr (has_flag(computeFlag, ComputeFlags::Parallel))
 				raw_data[raw_data_start + (i - 1) * length_j + j - 1].setData(index, QPoint(foundation_index / 512 * edge_segments + (i - 1 + n) % edge_segments, foundation_index % 512 * edge_segments + (j - 1 + m) % edge_segments));
 			else
 				raw_data.emplace_back(index, QPoint(foundation_index / 512 * edge_segments + (i - 1 + n) % edge_segments, foundation_index % 512 * edge_segments + (j - 1 + m) % edge_segments));
@@ -625,77 +625,77 @@ inline uint SingleThreadBase::get_point_index(const QPointF& point)
 		index = index_map.value(point);
 	else
 	{
-		index = static_cast<DataGenerator<false>*>(this)->points.size();
-		static_cast<DataGenerator<false>*>(this)->points.push_back(point);
+		index = static_cast<DataGenerator<ComputeFlags::None>*>(this)->points.size();
+		static_cast<DataGenerator<ComputeFlags::None>*>(this)->points.push_back(point);
 		index_map.insert(point, index);
 	}
 	return index;
 }
 
-template <bool parallel>
-void DataGenerator<parallel>::ProcessData()
+template <ComputeFlags computeFlag>
+void DataGenerator<computeFlag>::ProcessData()
 {
-	if (Calculator::useGPU)
+	if constexpr (computeFlag == ComputeFlags::None)
 	{
-		if constexpr (parallel)
+		container.data.reserve(raw_data.size());
+		for (auto& point : points)
+			point = spherical_to_screen_uv(point);
+		for (auto& tile : raw_data)
 		{
-			GPUAccelerator accelerator;
-			accelerator.initialize();
-			accelerator.compute(points, raw_data, this->points_size, this->raw_data_size, container);
+			auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
+			auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
+			container.data.emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
 		}
 	}
-	else
+	else if constexpr (computeFlag == ComputeFlags::Parallel)
 	{
-		if constexpr (parallel)
+		int thread_count_minus_one = Calculator::thread_count - 1;
+		// 多线程情况下，points.size()==10000000，必须使用points_size
+		int batch_size = (this->points_size + thread_count_minus_one - 1) / thread_count_minus_one;
+		for (int t = 0; t < thread_count_minus_one; ++t)
 		{
-			int thread_count_minus_one = Calculator::thread_count - 1;
-			// 多线程情况下，points.size()==10000000，必须使用points_size
-			int batch_size = (this->points_size + thread_count_minus_one - 1) / thread_count_minus_one;
-			for (int t = 0; t < thread_count_minus_one; ++t)
-			{
-				auto beg = points.begin() + t * batch_size;
-				auto end = (t == thread_count_minus_one - 1) ? points.begin() + this->points_size : beg + batch_size;
-				Calculator::computePool->start([this, beg, end]() {
-					for (auto it = beg; it != end; ++it)
-					{
-						auto& point = *it;
-						point = spherical_to_screen_uv(point);
-					}
-					});
-			}
-			Calculator::computePool->start([this]() {
-				container.data.resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
+			auto beg = points.begin() + t * batch_size;
+			auto end = (t == thread_count_minus_one - 1) ? points.begin() + this->points_size : beg + batch_size;
+			Calculator::computePool->start([this, beg, end]() {
+				for (auto it = beg; it != end; ++it)
+				{
+					auto& point = *it;
+					point = spherical_to_screen_uv(point);
+				}
 				});
-			Calculator::computePool->waitForDone();
-			batch_size = (this->raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;
-			for (int t = 0; t < Calculator::thread_count; ++t)
-			{
-				auto beg = raw_data.cbegin() + t * batch_size;
-				auto end = (t == Calculator::thread_count - 1) ? raw_data.cbegin() + this->raw_data_size : beg + batch_size;
-				Calculator::computePool->start([this, beg, end, t, batch_size]() {
-					for (auto it = beg; it != end; ++it)
-					{
-						auto& tile = *it;
-						auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
-						auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
-						container.data[t * batch_size + (it - beg)].setData(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
-					}
-					});
-			}
-			Calculator::computePool->waitForDone();
 		}
-		else
+		Calculator::computePool->start([this]() {
+			container.data.resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
+			});
+		Calculator::computePool->waitForDone();
+		batch_size = (this->raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;
+		for (int t = 0; t < Calculator::thread_count; ++t)
 		{
-			container.data.reserve(raw_data.size());
-			for (auto& point : points)
-				point = spherical_to_screen_uv(point);
-			for (auto& tile : raw_data)
-			{
-				auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
-				auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
-				container.data.emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
-			}
+			auto beg = raw_data.cbegin() + t * batch_size;
+			auto end = (t == Calculator::thread_count - 1) ? raw_data.cbegin() + this->raw_data_size : beg + batch_size;
+			Calculator::computePool->start([this, beg, end, t, batch_size]() {
+				for (auto it = beg; it != end; ++it)
+				{
+					auto& tile = *it;
+					auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
+					auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
+					container.data[t * batch_size + (it - beg)].setData(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+				}
+				});
 		}
+		Calculator::computePool->waitForDone();
+	}
+	else if constexpr (computeFlag == ComputeFlags::GpuEnabled)
+	{
+		GPUAccelerator accelerator;
+		accelerator.initialize();
+		accelerator.compute(points, raw_data, points.size(), raw_data.size(), container);
+	}
+	else if constexpr (computeFlag == ComputeFlags::All)
+	{
+		GPUAccelerator accelerator;
+		accelerator.initialize();
+		accelerator.compute(points, raw_data, this->points_size, this->raw_data_size, container);
 	}
 }
 
@@ -708,5 +708,7 @@ inline QPointF DataGeneratorBase::spherical_to_screen_uv(const QPointF& point)
 	return QPointF(0.5 + i / temp, 0.5 + j / temp);
 }
 
-template class DataGenerator<true>;
-template class DataGenerator<false>;
+template class DataGenerator<ComputeFlags::None>;
+template class DataGenerator<ComputeFlags::Parallel>;
+template class DataGenerator<ComputeFlags::GpuEnabled>;
+template class DataGenerator<ComputeFlags::All>;

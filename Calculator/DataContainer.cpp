@@ -8,9 +8,9 @@ DataContainer::DataContainer(qreal polar_angle, qreal azimuth_angle, qreal paint
 	if (!Load())
 	{
 		if (Calculator::thread_count > 1)
-			DataGenerator<true> generator(*this);
+			DataGenerator<ComputeFlags::Parallel> generator(*this);
 		else
-			DataGenerator<false> generator(*this);
+			DataGenerator<ComputeFlags::None> generator(*this);
 		if (Calculator::saveIntermediate)
 			Save();
 	}

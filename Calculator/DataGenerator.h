@@ -13,9 +13,26 @@ namespace std {
 	};
 }
 
+class QPointFloat
+{
+public:
+	QPointFloat(float x = 0.0f, float y = 0.0f) :x_coord(x), y_coord(y) {}
+	QPointFloat(const QPointF& point) :x_coord(static_cast<float>(point.x())), y_coord(static_cast<float>(point.y())) {}
+	operator QPointF() const { return QPointF(static_cast<qreal>(x_coord), static_cast<qreal>(y_coord)); }
+	QPointFloat& operator=(const QPointF& point) {
+		x_coord = static_cast<float>(point.x());
+		y_coord = static_cast<float>(point.y());
+		return *this;
+	}
+	float x() const { return x_coord; }
+	float y() const { return y_coord; }
+private:
+	float x_coord, y_coord;
+};
+
 class TileRawData
 {
-	template <bool>
+	template <ComputeFlags>
 	friend class DataGenerator;
 public:
 	TileRawData(uint index[], const QPoint& pos) :texture_pos(pos)
@@ -47,13 +64,11 @@ protected:
 
 class DataGeneratorBase
 {
-	friend SingleThreadBase;
 public:
 	DataGeneratorBase(DataContainer& container) :container(container) {}
 
 protected:
 	DataContainer& container;
-	std::vector<QPointF, no_init_allocator<QPointF>> points;
 	std::vector<TileRawData, no_init_allocator<TileRawData>> raw_data;
 
 	bool point_is_in_painting(qreal theta, qreal phi);
@@ -593,13 +608,16 @@ protected:
 	};
 };
 
-template <bool parallel>
-class DataGenerator : public DataGeneratorBase, public std::conditional_t<parallel, ParallelBase, SingleThreadBase>
+template <ComputeFlags computeFlag>
+class DataGenerator : public DataGeneratorBase, public std::conditional_t<has_flag(computeFlag, ComputeFlags::Parallel), ParallelBase, SingleThreadBase>
 {
+	friend SingleThreadBase;
 public:
 	DataGenerator(DataContainer& container);
 
 private:
+	std::conditional_t<has_flag(computeFlag, ComputeFlags::GpuEnabled), std::vector<QPointFloat, no_init_allocator<QPointFloat>>, std::vector<QPointF, no_init_allocator<QPointF>>> points;
+
 	void GenerateData();
 	// 参数表示的区域有且仅有部分地基在图片范围内，四个bool类型参数表示四个定点调用point_is_in_painting的返回值
 	void GenerateData(qreal min_polar_angle, qreal max_polar_angle, qreal min_azimuth_angle, qreal max_azimuth_angle, bool min_p_min_a_in_painting, bool min_p_max_a_in_painting, bool max_p_min_a_in_painting, bool max_p_max_a_in_painting);

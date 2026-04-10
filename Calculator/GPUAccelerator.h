@@ -18,7 +18,7 @@ public:
 	bool initialize();
 
 	// 核心计算接口
-	bool compute(const std::vector<QPointF, no_init_allocator<QPointF>>& points,
+	bool compute(const std::vector<QPointFloat, no_init_allocator<QPointFloat>>& points,
 		const std::vector<TileRawData, no_init_allocator<TileRawData>>& raw_data,
 		const uint points_size,
 		const uint raw_data_size,
