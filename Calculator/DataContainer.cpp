@@ -8,9 +8,19 @@ DataContainer::DataContainer(qreal polar_angle, qreal azimuth_angle, qreal paint
 	if (!Load())
 	{
 		if (Calculator::thread_count > 1)
-			DataGenerator<ComputeFlags::Parallel> generator(*this);
+		{
+			/*if (Calculator::useGPU)
+				DataGenerator<ComputeFlags::All> generator(*this);
+			else*/
+				DataGenerator<ComputeFlags::Parallel> generator(*this);
+		}
 		else
-			DataGenerator<ComputeFlags::None> generator(*this);
+		{
+			/*if (Calculator::useGPU)
+				DataGenerator<ComputeFlags::GpuEnabled> generator(*this);
+			else*/
+				DataGenerator<ComputeFlags::None> generator(*this);
+		}
 		if (Calculator::saveIntermediate)
 			Save();
 	}

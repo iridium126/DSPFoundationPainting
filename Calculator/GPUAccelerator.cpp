@@ -8,13 +8,14 @@ GPUAccelerator::~GPUAccelerator()
 bool GPUAccelerator::initialize()
 {
 	QRhiD3D12InitParams params;
+	params.enableDebugLayer = true;
 	rhi = QRhi::create(QRhi::D3D12, &params);
 
 	// 创建缓冲区对象
-	pointBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(QPointF));
+	pointBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(QPointFloat));
 	tileBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(TileRawData));
 	outputBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(uint64_t));
-	uniformBuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 20);
+	uniformBuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, rhi->ubufAligned(20));
 	pointBuf->create();
 	tileBuf->create();
 	outputBuf->create();
@@ -23,10 +24,10 @@ bool GPUAccelerator::initialize()
 	// 创建资源绑定布局
 	srb = rhi->newShaderResourceBindings();
 	srb->setBindings({
-		QRhiShaderResourceBinding::bufferStore(0, QRhiShaderResourceBinding::ComputeStage, pointBuf),
-		QRhiShaderResourceBinding::bufferStore(1, QRhiShaderResourceBinding::ComputeStage, tileBuf),
-		QRhiShaderResourceBinding::bufferLoad(2, QRhiShaderResourceBinding::ComputeStage, outputBuf),
-		QRhiShaderResourceBinding::uniformBuffer(3, QRhiShaderResourceBinding::ComputeStage, uniformBuf)
+		QRhiShaderResourceBinding::bufferLoadStore(0, QRhiShaderResourceBinding::ComputeStage, pointBuf, 0, pointBuf->size()),
+		QRhiShaderResourceBinding::bufferLoadStore(1, QRhiShaderResourceBinding::ComputeStage, tileBuf, 0, tileBuf->size()),
+		QRhiShaderResourceBinding::bufferLoadStore(2, QRhiShaderResourceBinding::ComputeStage, outputBuf, 0, outputBuf->size()),
+		QRhiShaderResourceBinding::uniformBuffer(3, QRhiShaderResourceBinding::ComputeStage, uniformBuf, 0, rhi->ubufAligned(20))
 		});
 	srb->create();
 
@@ -50,13 +51,15 @@ bool GPUAccelerator::initialize()
 	pointPipeline = rhi->newComputePipeline();
 	pointPipeline->setShaderResourceBindings(srb);
 	pointPipeline->setShaderStage({ QRhiShaderStage::Compute, pointShader });
-	pointPipeline->create();
+	if (!pointPipeline->create())
+		return false;
 
 	// 管线2：瓦片打包
 	tilePipeline = rhi->newComputePipeline();
 	tilePipeline->setShaderResourceBindings(srb);
 	tilePipeline->setShaderStage({ QRhiShaderStage::Compute, tileShader });
-	tilePipeline->create();
+	if (!tilePipeline->create())
+		return false;
 
 	return true;
 }
@@ -67,7 +70,7 @@ bool GPUAccelerator::compute(const std::vector<QPointFloat, no_init_allocator<QP
 	const uint raw_data_size,
 	DataContainer& container)
 {
-	const qint64 pointBytes = points_size * sizeof(QPointF);
+	const qint64 pointBytes = points_size * sizeof(QPointFloat);
 	const qint64 tileBytes = raw_data_size * sizeof(TileRawData);
 	const qint64 outBytes = raw_data_size * sizeof(uint64_t);
 
@@ -86,8 +89,8 @@ bool GPUAccelerator::compute(const std::vector<QPointFloat, no_init_allocator<QP
 	QRhiResourceUpdateBatch* batch = rhi->nextResourceUpdateBatch();
 
 	// 上传数据
-	batch->updateDynamicBuffer(pointBuf, 0, pointBytes, points.data());
-	batch->updateDynamicBuffer(tileBuf, 0, tileBytes, raw_data.data());
+	batch->uploadStaticBuffer(pointBuf, 0, pointBytes, points.data());
+	batch->uploadStaticBuffer(tileBuf, 0, tileBytes, raw_data.data());
 	batch->updateDynamicBuffer(uniformBuf, 0, sizeof(UniformData), &uniformData);
 
 	QRhiCommandBuffer* cb = nullptr;
@@ -98,14 +101,12 @@ bool GPUAccelerator::compute(const std::vector<QPointFloat, no_init_allocator<QP
 	// 阶段1：点坐标变换
 	cb->setComputePipeline(pointPipeline);
 	cb->setShaderResources(srb);
-
 	cb->dispatch((points_size + 255) / 256, 1, 1);
-	// 内存屏障：保证点数据写入完成
-	cb->endComputePass();
-	cb->beginComputePass();
+
 
 	// 阶段2：瓦片打包
 	cb->setComputePipeline(tilePipeline);
+	cb->setShaderResources(srb);
 	cb->dispatch((raw_data_size + 255) / 256, 1, 1);
 
 	QRhiReadbackResult readbackResult;
@@ -115,7 +116,7 @@ bool GPUAccelerator::compute(const std::vector<QPointFloat, no_init_allocator<QP
 
 	// 结束离屏帧，同步等待计算完成
 	rhi->endOffscreenFrame();
-
+	rhi->finish();
 	// 读回结果
 
 	const QByteArray& readbackData = readbackResult.data;
@@ -140,4 +141,6 @@ void GPUAccelerator::destroy()
 	delete outputBuf;
 	delete uniformBuf;
 	delete rhi;
+
+	rhi = nullptr;
 }
