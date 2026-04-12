@@ -6,9 +6,12 @@ layout(std430, binding = 0) buffer PointBuffer { vec2 points[]; };
 layout(std140, binding = 3) uniform UniformBlock {
     uint pointCount;
     uint tileCount;
-    float polar_angle;
     float azimuth_angle;
-    float painting_central_angle;
+    // 预计算常量（CPU计算后传入，GPU直接读取，零计算开销）
+    float polar_sin;         // sin(polar_angle)
+    float polar_cos;         // cos(polar_angle)
+    float half_paint_sin;    // sin(painting_central_angle * 0.5)
+    float half_paint_cos;    // cos(painting_central_angle * 0.5)
 } ubo;
 
 void main() {
@@ -18,17 +21,14 @@ void main() {
     vec2 p = points[gid];
     float sin_px = sin(p.x);
     float cos_px = cos(p.x);
-    float y_az = p.y - ubo.azimuth_angle;
-    float sin_yaz = sin(y_az);
-    float cos_yaz = cos(y_az);
-    float cos_p = cos(ubo.polar_angle);
-    float sin_p = sin(ubo.polar_angle);
+    float y_az   = p.y - ubo.azimuth_angle;
+    float sin_yaz= sin(y_az);
+    float cos_yaz= cos(y_az);
 
     float i = sin_px * sin_yaz;
-    float j = -sin_px * cos_p * cos_yaz + cos_px * sin_p;
-    float k = sin_px * sin_p * cos_yaz + cos_px * cos_p;
+    float j = fma(-sin_px * ubo.polar_cos, cos_yaz, cos_px * ubo.polar_sin);
+    float k = fma( sin_px * ubo.polar_sin, cos_yaz, cos_px * ubo.polar_cos);
 
-    float half_angle = ubo.painting_central_angle * 0.5;
-    float temp = (1.0 - k * cos(half_angle)) * 2.0 / sin(half_angle);
-    points[gid] = vec2(0.5 + i / temp, 0.5 + j / temp);
+    float denominator = 2.0 * (1.0 - k * ubo.half_paint_cos) / ubo.half_paint_sin;
+    points[gid] = vec2(0.5 + i / denominator, 0.5 + j / denominator);
 }

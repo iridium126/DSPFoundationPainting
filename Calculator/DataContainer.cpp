@@ -9,16 +9,16 @@ DataContainer::DataContainer(qreal polar_angle, qreal azimuth_angle, qreal paint
 	{
 		if (Calculator::thread_count > 1)
 		{
-			/*if (Calculator::useGPU)
+			if (Calculator::useGPU)
 				DataGenerator<ComputeFlags::All> generator(*this);
-			else*/
+			else
 				DataGenerator<ComputeFlags::Parallel> generator(*this);
 		}
 		else
 		{
-			/*if (Calculator::useGPU)
+			if (Calculator::useGPU)
 				DataGenerator<ComputeFlags::GpuEnabled> generator(*this);
-			else*/
+			else
 				DataGenerator<ComputeFlags::None> generator(*this);
 		}
 		if (Calculator::saveIntermediate)
@@ -41,8 +41,8 @@ bool DataContainer::Load()
 	fin.read(reinterpret_cast<char*>(&data_size), sizeof(size_t));
 	if (data_size > 0)
 	{
-		data.resize(data_size);
-		fin.read(reinterpret_cast<char*>(data.data()), sizeof(TileData) * data_size);
+		data->resize(data_size);
+		fin.read(reinterpret_cast<char*>(data->data()), sizeof(TileData) * data_size);
 	}
 	fin.close();
 	return true;
@@ -57,10 +57,10 @@ void DataContainer::Save()
 	fout.write(reinterpret_cast<const char*>(&polar_angle), sizeof(qreal));
 	fout.write(reinterpret_cast<const char*>(&azimuth_angle), sizeof(qreal));
 	fout.write(reinterpret_cast<const char*>(&painting_central_angle), sizeof(qreal));
-	size_t data_size = data.size();
+	size_t data_size = data->size();
 	fout.write(reinterpret_cast<const char*>(&data_size), sizeof(size_t));
 	if (data_size > 0)
-		fout.write(reinterpret_cast<const char*>(data.data()), sizeof(TileData) * data_size);
+		fout.write(reinterpret_cast<const char*>(data->data()), sizeof(TileData) * data_size);
 	fout.close();
 }
 

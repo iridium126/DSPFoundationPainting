@@ -19,11 +19,11 @@ bool DataAccessor::ProcessPicture(const QString& fileName)
 	output.fill(Qt::transparent);
 	if (Calculator::thread_count > 1)
 	{
-		int batch_size = (container.data.size() + Calculator::thread_count - 1) / Calculator::thread_count;
+		int batch_size = (container.data->size() + Calculator::thread_count - 1) / Calculator::thread_count;
 		for (int t = 0; t < Calculator::thread_count; ++t)
 		{
-			auto beg = container.data.cbegin() + t * batch_size;
-			auto end = (t == Calculator::thread_count - 1) ? container.data.cend() : container.data.cbegin() + (t + 1) * batch_size;
+			auto beg = container.data->cbegin() + t * batch_size;
+			auto end = (t == Calculator::thread_count - 1) ? container.data->cend() : container.data->cbegin() + (t + 1) * batch_size;
 			Calculator::computePool->start([this, beg, end, &input, offset_i, offset_j, min_side]() {
 				for (auto it = beg; it != end; ++it)
 				{
@@ -50,7 +50,7 @@ bool DataAccessor::ProcessPicture(const QString& fileName)
 	}
 	else
 	{
-		for (const auto& tile : container.data)
+		for (const auto& tile : *container.data)
 		{
 			const QRgb* line_in = reinterpret_cast<const QRgb*>(input.constScanLine(offset_i + tile.v() * min_side));
 			QRgb* line_out = reinterpret_cast<QRgb*>(output.scanLine(tile.x()));

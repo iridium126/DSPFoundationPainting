@@ -637,14 +637,15 @@ void DataGenerator<computeFlag>::ProcessData()
 {
 	if constexpr (computeFlag == ComputeFlags::None)
 	{
-		container.data.reserve(raw_data.size());
+		container.data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>();
+		container.data->reserve(raw_data.size());
 		for (auto& point : points)
 			point = spherical_to_screen_uv(point);
 		for (auto& tile : raw_data)
 		{
 			auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
 			auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
-			container.data.emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+			container.data->emplace_back(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
 		}
 	}
 	else if constexpr (computeFlag == ComputeFlags::Parallel)
@@ -665,7 +666,8 @@ void DataGenerator<computeFlag>::ProcessData()
 				});
 		}
 		Calculator::computePool->start([this]() {
-			container.data.resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
+			container.data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>();
+			container.data->resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
 			});
 		Calculator::computePool->waitForDone();
 		batch_size = (this->raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;
@@ -679,7 +681,7 @@ void DataGenerator<computeFlag>::ProcessData()
 					auto& tile = *it;
 					auto [u_min, u_max] = std::minmax({ points[tile.point_index[0]].x(), points[tile.point_index[1]].x(), points[tile.point_index[2]].x(), points[tile.point_index[3]].x() });
 					auto [v_min, v_max] = std::minmax({ points[tile.point_index[0]].y(), points[tile.point_index[1]].y(), points[tile.point_index[2]].y(), points[tile.point_index[3]].y() });
-					container.data[t * batch_size + (it - beg)].setData(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
+					(*container.data)[t * batch_size + (it - beg)].setData(QPointF((u_min + u_max) / 2, (v_min + v_max) / 2), tile.texture_pos);
 				}
 				});
 		}

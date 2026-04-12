@@ -15,11 +15,11 @@ bool GPUAccelerator::initialize()
 	pointBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(QPointFloat));
 	tileBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(TileRawData));
 	outputBuf = rhi->newBuffer(QRhiBuffer::Static, QRhiBuffer::StorageBuffer, 10000000 * sizeof(uint64_t));
-	uniformBuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, rhi->ubufAligned(20));
-	pointBuf->create();
-	tileBuf->create();
-	outputBuf->create();
-	uniformBuf->create();
+	uniformBuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, rhi->ubufAligned(28));
+	if (!pointBuf->create()) return false;
+	if (!tileBuf->create()) return false;
+	if (!outputBuf->create()) return false;
+	if (!uniformBuf->create()) return false;
 
 	// 创建资源绑定布局
 	srb = rhi->newShaderResourceBindings();
@@ -27,9 +27,9 @@ bool GPUAccelerator::initialize()
 		QRhiShaderResourceBinding::bufferLoadStore(0, QRhiShaderResourceBinding::ComputeStage, pointBuf, 0, pointBuf->size()),
 		QRhiShaderResourceBinding::bufferLoadStore(1, QRhiShaderResourceBinding::ComputeStage, tileBuf, 0, tileBuf->size()),
 		QRhiShaderResourceBinding::bufferLoadStore(2, QRhiShaderResourceBinding::ComputeStage, outputBuf, 0, outputBuf->size()),
-		QRhiShaderResourceBinding::uniformBuffer(3, QRhiShaderResourceBinding::ComputeStage, uniformBuf, 0, rhi->ubufAligned(20))
+		QRhiShaderResourceBinding::uniformBuffer(3, QRhiShaderResourceBinding::ComputeStage, uniformBuf, 0, rhi->ubufAligned(28))
 		});
-	srb->create();
+	if (!srb->create()) return false;
 
 	// 加载离线编译的着色器（.qsb）
 	auto loadShader = [this](const QString& path) -> QShader {
@@ -41,25 +41,21 @@ bool GPUAccelerator::initialize()
 	QShader pointShader = loadShader(":/shaders/shaders/point_transform.qsb");
 	QShader tileShader = loadShader(":/shaders/shaders/tile_pack.qsb");
 
-	if (!pointShader.isValid() || !tileShader.isValid()) {
-		qCritical() << "着色器加载失败！";
+	if (!pointShader.isValid() || !tileShader.isValid())
 		return false;
-	}
 
 	// 创建计算管线
 	// 管线1：点坐标变换
 	pointPipeline = rhi->newComputePipeline();
 	pointPipeline->setShaderResourceBindings(srb);
 	pointPipeline->setShaderStage({ QRhiShaderStage::Compute, pointShader });
-	if (!pointPipeline->create())
-		return false;
+	if (!pointPipeline->create()) return false;
 
 	// 管线2：瓦片打包
 	tilePipeline = rhi->newComputePipeline();
 	tilePipeline->setShaderResourceBindings(srb);
 	tilePipeline->setShaderStage({ QRhiShaderStage::Compute, tileShader });
-	if (!tilePipeline->create())
-		return false;
+	if (!tilePipeline->create()) return false;
 
 	return true;
 }
@@ -70,32 +66,30 @@ bool GPUAccelerator::compute(const std::vector<QPointFloat, no_init_allocator<QP
 	const uint raw_data_size,
 	DataContainer& container)
 {
-	const qint64 pointBytes = points_size * sizeof(QPointFloat);
-	const qint64 tileBytes = raw_data_size * sizeof(TileRawData);
-	const qint64 outBytes = raw_data_size * sizeof(uint64_t);
-
 	struct UniformData {
 		uint points_size;
 		uint raw_data_size;
-		float polar_angle;
 		float azimuth_angle;
-		float painting_central_angle;
+		float polar_sin;      // sin(polar_angle)
+		float polar_cos;      // cos(polar_angle)
+		float half_paint_sin; // sin(painting_central_angle * 0.5)
+		float half_paint_cos; // cos(painting_central_angle * 0.5)
 	} uniformData{ points_size, raw_data_size,
-		static_cast<float>(container.polar_angle),
 		static_cast<float>(container.azimuth_angle),
-		static_cast<float>(container.painting_central_angle) };
+		static_cast<float>(sin(container.polar_angle)),
+		static_cast<float>(cos(container.polar_angle)),
+		static_cast<float>(sin(container.painting_central_angle * 0.5)),
+		static_cast<float>(cos(container.painting_central_angle * 0.5))
+	};
 
 	// 创建资源更新批处理
 	QRhiResourceUpdateBatch* batch = rhi->nextResourceUpdateBatch();
-
-	// 上传数据
-	batch->uploadStaticBuffer(pointBuf, 0, pointBytes, points.data());
-	batch->uploadStaticBuffer(tileBuf, 0, tileBytes, raw_data.data());
+	batch->uploadStaticBuffer(pointBuf, 0, points_size * sizeof(QPointFloat), points.data());
+	batch->uploadStaticBuffer(tileBuf, 0, raw_data_size * sizeof(TileRawData), raw_data.data());
 	batch->updateDynamicBuffer(uniformBuf, 0, sizeof(UniformData), &uniformData);
 
 	QRhiCommandBuffer* cb = nullptr;
 	rhi->beginOffscreenFrame(&cb);
-	// 提交上传
 	cb->beginComputePass(batch);
 
 	// 阶段1：点坐标变换
@@ -103,28 +97,27 @@ bool GPUAccelerator::compute(const std::vector<QPointFloat, no_init_allocator<QP
 	cb->setShaderResources(srb);
 	cb->dispatch((points_size + 255) / 256, 1, 1);
 
+	cb->endComputePass();
+	cb->beginComputePass();
 
 	// 阶段2：瓦片打包
 	cb->setComputePipeline(tilePipeline);
 	cb->setShaderResources(srb);
 	cb->dispatch((raw_data_size + 255) / 256, 1, 1);
 
-	QRhiReadbackResult readbackResult;
+	auto* result = new QRhiReadbackResult;
+	result->completed = [&container, result, raw_data_size]() {
+		// 读回结果
+		container.rhi_result_resource = std::make_unique<RhiResultMemoryResource>(result); // 交由DataContainer管理生命周期
+		container.data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>(container.rhi_result_resource.get());
+		container.data->resize(raw_data_size);
+		};
 	batch = rhi->nextResourceUpdateBatch();
-	batch->readBackBuffer(outputBuf, 0, outBytes, &readbackResult);
-	cb->endComputePass(batch); // 传入读回批次，确保计算完成后读回
+	batch->readBackBuffer(outputBuf, 0, raw_data_size * sizeof(uint64_t), result);
+	cb->endComputePass(batch);
 
 	// 结束离屏帧，同步等待计算完成
 	rhi->endOffscreenFrame();
-	rhi->finish();
-	// 读回结果
-
-	const QByteArray& readbackData = readbackResult.data;
-
-	// 直接构造（最高效，无多余拷贝）
-	container.data.assign(reinterpret_cast<const uint64_t*>(readbackData.constData()),
-		reinterpret_cast<const uint64_t*>(readbackData.constData() + readbackData.size()));
-
 
 	return true;
 }

@@ -4,6 +4,36 @@
 #include <QPointF>
 #include <QDir>
 #include <QCryptographicHash>
+#include <rhi/qrhi.h>
+
+class RhiResultMemoryResource : public std::pmr::memory_resource
+{
+public:
+	explicit RhiResultMemoryResource(QRhiReadbackResult* result) : result(result) {}
+
+	~RhiResultMemoryResource()
+	{
+		delete result;
+	}
+
+protected:
+	// 从QByteArray分配内存，只能分配一次
+	void* do_allocate(size_t bytes, size_t alignment) override
+	{
+		return const_cast<void*>(static_cast<const void*>(result->data.constData()));
+	}
+
+	void do_deallocate(void*, size_t, size_t) override {}
+
+	// 判断两个内存资源是否相等
+	bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override
+	{
+		return this == &other;
+	}
+
+private:
+	QRhiReadbackResult* result;
+};
 
 // 不初始化分配器：在resize(n)等需要分配但不需要初始化的场景下使用，避免不必要的构造函数调用。
 template <typename T, typename Alloc = std::allocator<T>>
@@ -30,7 +60,7 @@ public:
 	// 当传入初始化参数时（如 resize(n, val)、emplace_back 等），正常转发给基类
 	template <typename U, typename... Args>
 	void construct(U* ptr, Args&&... args) {
-		traits::construct(static_cast<Alloc&>(*this), ptr, std::forward<Args>(args)...);
+		traits::construct(*this, ptr, std::forward<Args>(args)...);
 	}
 };
 
@@ -71,7 +101,6 @@ public:
 	{
 		setData(uv, pos);
 	}
-	TileData(const uint64_t packed) : packed_data(packed) {}
 private:
 	uint64_t packed_data; // 将uv坐标和纹理坐标打包成一个64位整数，节省空间
 	static constexpr uint32_t FIXED_SCALE = (1 << 19) - 1;
@@ -116,6 +145,8 @@ public:
 	qreal polar_angle, azimuth_angle; // 极角、方位角
 	qreal painting_central_angle;     // 图片在球面上的边界的直径所对的圆心角
 private:
-	std::vector<TileData, no_init_allocator<TileData>> data;
+	// GPU计算结果的内存资源，生命周期由DataContainer管理，先声明，后析构
+	std::unique_ptr<RhiResultMemoryResource> rhi_result_resource;
+	std::unique_ptr<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>> data;
 	QByteArray get_file_name() const;
 };
