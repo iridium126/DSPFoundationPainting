@@ -41,7 +41,7 @@ bool DataContainer::Load()
 	fin.read(reinterpret_cast<char*>(&data_size), sizeof(size_t));
 	if (data_size > 0)
 	{
-		data->resize(data_size);
+		data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>(data_size);
 		fin.read(reinterpret_cast<char*>(data->data()), sizeof(TileData) * data_size);
 	}
 	fin.close();

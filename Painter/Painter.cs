@@ -13,27 +13,38 @@ using UnityEngine.UI;
 
 namespace DSPBasePainter
 {
-	[BepInPlugin("Iridium126.Plugins.DSPBasePainter", "DSPBasePainter", "1.0.0")]
+	[BepInPlugin(GUID, NAME, VERSION)]
 	public class Painter : BaseUnityPlugin
 	{
-		private static Shader shaderPatch;
+		public const string GUID = "Iridium126.Plugins.DSPBasePainter";
+		public const string NAME = "DSPBasePainter";
+		public const string VERSION = "1.0.0";
+
+		private static Harmony harmony;
+		public static Shader shaderPatch;
 		private static UIButton paintButton;
 		private const int maxPlanetCount = 6;
-		private static readonly Texture2D[] paintingTexs = new Texture2D[maxPlanetCount];
-		private const string GameSave_CurrentGame = "_currentgame_";
-		private static string textureSaveFolder;
+		public static readonly Texture2D[] paintingTexs = new Texture2D[maxPlanetCount];
+
 		private void Start()
 		{
-			Harmony.CreateAndPatchAll(typeof(Painter));
+			harmony = new Harmony(GUID);
+			harmony.PatchAll(typeof(Painter));
+			harmony.PatchAll(typeof(PlayerFootsteps_Patch));
+			harmony.PatchAll(typeof(TextureStorage));
+
 			AssetBundle shadersBundle = AssetBundle.LoadFromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("DSPBasePainter.shaders"));
 			shaderPatch = shadersBundle.LoadAsset<Shader>("VF Shaders_Forward_Terrain Reform");
 			shadersBundle.Unload(false);
-			//Debug.Log($"shader_patch.isSupported:{shaderPatch.isSupported}");
-			/*ShaderVariantCollection svc = assetBundle.LoadAsset<ShaderVariantCollection>("ShaderVariants");
-			svc.WarmUp();*/
+
 			for (int i = 0; i < maxPlanetCount; ++i)
 				paintingTexs[i] = new Texture2D(4096, 5088, TextureFormat.RGBA32, false);
-			textureSaveFolder = Config.ConfigFilePath.Substring(0, Config.ConfigFilePath.LastIndexOf('.')) + "/";
+			TextureStorage.textureSaveFolder = Path.Combine(
+				Path.GetDirectoryName(Config.ConfigFilePath),
+				Path.GetFileNameWithoutExtension(Config.ConfigFilePath)
+				);
+			TextureStorage.Init();
+
 			StartCoroutine(InitPaintButton());
 		}
 		private IEnumerator InitPaintButton()
@@ -76,7 +87,8 @@ namespace DSPBasePainter
 			ofn.dlgOwner = FileDialog.GetForegroundWindow(); // 设置对话框的父窗口为当前活动窗口
 			if (!FileDialog.GetOpenFileName(ofn))
 				yield break;
-			byte[] pngBytes = File.ReadAllBytes(ofn.file);
+			string filePath = ofn.file;
+			byte[] pngBytes = File.ReadAllBytes(filePath);
 			if (pngBytes == null || pngBytes.Length < 8)
 				yield break;
 			byte[] pngSignature = new byte[8];
@@ -193,6 +205,8 @@ namespace DSPBasePainter
 			reformMat1.SetTexture("_PaintingTexture", paintingTexs[localPlanet.index]);
 			//Debug.Log($"receiveShadows : {GameMain.universeSimulator.FindPlanetSimulator(GameMain.localPlanet).reformRenderer.receiveShadows}");//true
 			//Debug.Log($"lightProbeUsage : {GameMain.universeSimulator.FindPlanetSimulator(GameMain.localPlanet).reformRenderer.lightProbeUsage}");//Off
+
+			TextureStorage.SaveTexture(localPlanet.id, filePath, pngBytes);
 		}
 
 		[HarmonyTranspiler, HarmonyPatch(typeof(BuildTool_BlueprintPaste), "DetermineReforms")]
@@ -248,42 +262,6 @@ namespace DSPBasePainter
 					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Painter), "PaintButtonSetActive")))
 				.InstructionEnumeration();
 		}
-		public static bool IsTerrainMapping(int index, int type)
-		{
-			if (type <= 0)
-				return false;
-			else if (type < 7)
-				return true;
-			else if (type == 7)
-			{
-				PlanetData localPlanet = GameMain.localPlanet;
-				if (localPlanet.reformMaterial0.shader != shaderPatch || localPlanet.reformMaterial1.shader != shaderPatch)
-					return false;
-				// 选取地基中心像素，粗略判断
-				if (paintingTexs[localPlanet.index].GetPixel(index % 512 * 8 + 4, 5087 - (index / 512 * 8 + 4)).a == 0f)
-					return false;
-				else
-					return true;
-			}
-			else
-				return false;
-		}
-
-		[HarmonyTranspiler, HarmonyPatch(typeof(PlayerFootsteps), "CheckPlayerInReform")]
-		private static IEnumerable<CodeInstruction> CheckPlayerInReform_Patch(IEnumerable<CodeInstruction> instructions)
-		{
-			CodeMatcher codeMatcher = new CodeMatcher(instructions)
-				.MatchForward(false,
-					new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(PlatformSystem), "IsTerrainMapping")))
-				.Set(
-					OpCodes.Call, AccessTools.Method(typeof(Painter), "IsTerrainMapping"))
-				.MatchBack(false,
-					new CodeMatch(OpCodes.Ldloc_3));
-			return codeMatcher
-				.SetInstruction(codeMatcher.InstructionAt(-3))
-				.InstructionEnumeration();
-		}
-
 		/*[HarmonyPostfix, HarmonyPatch(typeof(GameSave), "AutoSave")]
 		private static void AutoSave_Postfix(bool __result)
 		{

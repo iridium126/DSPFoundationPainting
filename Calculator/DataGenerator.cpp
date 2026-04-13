@@ -666,8 +666,8 @@ void DataGenerator<computeFlag>::ProcessData()
 				});
 		}
 		Calculator::computePool->start([this]() {
-			container.data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>();
-			container.data->resize(this->raw_data_size); // 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
+			// 多线程情况下，raw_data.size()==10000000，必须使用raw_data_size
+			container.data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>(this->raw_data_size);
 			});
 		Calculator::computePool->waitForDone();
 		batch_size = (this->raw_data_size + Calculator::thread_count - 1) / Calculator::thread_count;

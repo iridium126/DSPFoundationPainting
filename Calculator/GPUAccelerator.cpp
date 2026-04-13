@@ -109,8 +109,7 @@ bool GPUAccelerator::compute(const std::vector<QPointFloat, no_init_allocator<QP
 	result->completed = [&container, result, raw_data_size]() {
 		// 读回结果
 		container.rhi_result_resource = std::make_unique<RhiResultMemoryResource>(result); // 交由DataContainer管理生命周期
-		container.data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>(container.rhi_result_resource.get());
-		container.data->resize(raw_data_size);
+		container.data = std::make_unique<std::vector<TileData, no_init_allocator<TileData, std::pmr::polymorphic_allocator<TileData>>>>(raw_data_size, container.rhi_result_resource.get());
 		};
 	batch = rhi->nextResourceUpdateBatch();
 	batch->readBackBuffer(outputBuf, 0, raw_data_size * sizeof(uint64_t), result);

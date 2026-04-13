@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace DSPBasePainter
 {
 	// 调用Windows API打开文件对话框
-	public static class FileDialog
+	internal static class FileDialog
 	{
 		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
 		public class OpenFileName
