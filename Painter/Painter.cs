@@ -209,7 +209,7 @@ namespace DSPBasePainter
 			TextureStorage.SaveTexture(localPlanet.id, filePath, pngBytes);
 		}
 
-		[HarmonyTranspiler, HarmonyPatch(typeof(BuildTool_BlueprintPaste), "DetermineReforms")]
+		[HarmonyTranspiler, HarmonyPatch(typeof(BuildTool_BlueprintPaste), nameof(BuildTool_BlueprintPaste.DetermineReforms))]
 		private static IEnumerable<CodeInstruction> DetermineReforms_Patch(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
 		{
 			CodeMatcher codeMatcher = new CodeMatcher(instructions, generator)
@@ -236,7 +236,7 @@ namespace DSPBasePainter
 			paintButton.gameObject.SetActive(value);
 		}
 
-		[HarmonyTranspiler, HarmonyPatch(typeof(UIBuildMenu), "_OnUpdate")]
+		[HarmonyTranspiler, HarmonyPatch(typeof(UIBuildMenu), nameof(UIBuildMenu._OnUpdate))]
 		private static IEnumerable<CodeInstruction> OnUpdate_Patch(IEnumerable<CodeInstruction> instructions)
 		{
 			return new CodeMatcher(instructions)
@@ -262,29 +262,5 @@ namespace DSPBasePainter
 					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Painter), "PaintButtonSetActive")))
 				.InstructionEnumeration();
 		}
-		/*[HarmonyPostfix, HarmonyPatch(typeof(GameSave), "AutoSave")]
-		private static void AutoSave_Postfix(bool __result)
-		{
-			if (!__result)
-				return;
-			string currentGame = textureSaveFolder + GameSave_CurrentGame;
-			Debug.Log($"AutoSave_Postfix: currentGame={currentGame}");
-			if (Directory.Exists(currentGame))
-			{
-				string autoSave0 = textureSaveFolder + GameSave.AutoSave0;
-				string autoSave1 = textureSaveFolder + GameSave.AutoSave1;
-				string autoSave2 = textureSaveFolder + GameSave.AutoSave2;
-				string autoSave3 = textureSaveFolder + GameSave.AutoSave3;
-				if (Directory.Exists(autoSave3))
-					Directory.Delete(autoSave3, true);
-				if (Directory.Exists(autoSave2))
-					Directory.Move(autoSave2, autoSave3);
-				if (Directory.Exists(autoSave1))
-					Directory.Move(autoSave1, autoSave2);
-				if (Directory.Exists(autoSave0))
-					Directory.Move(autoSave0, autoSave1);
-				Directory.Move(currentGame, autoSave0);
-			}
-		}*/
 	}
 }
