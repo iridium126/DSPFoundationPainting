@@ -11,20 +11,21 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace DSPBasePainter
+namespace DSPFoundationPainter
 {
 	[BepInPlugin(GUID, NAME, VERSION)]
 	public class Painter : BaseUnityPlugin
 	{
-		public const string GUID = "Iridium126.Plugins.DSPBasePainter";
-		public const string NAME = "DSPBasePainter";
-		public const string VERSION = "1.0.0";
+		public const string GUID = "Iridium126.Plugins.DSPFoundationPainter";
+		public const string NAME = "DSPFoundationPainter";
+		public const string VERSION = "0.1.0";
 
 		private static Harmony harmony;
 		public static Shader shaderPatch;
 		private static UIButton paintButton;
 		private const int maxPlanetCount = 6;
 		public static readonly Texture2D[] paintingTexs = new Texture2D[maxPlanetCount];
+		private static Texture2D tempTex;
 
 		private void Start()
 		{
@@ -33,12 +34,13 @@ namespace DSPBasePainter
 			harmony.PatchAll(typeof(PlayerFootsteps_Patch));
 			harmony.PatchAll(typeof(TextureStorage));
 
-			AssetBundle shadersBundle = AssetBundle.LoadFromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("DSPBasePainter.shaders"));
+			AssetBundle shadersBundle = AssetBundle.LoadFromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("DSPFoundationPainter.shaders"));
 			shaderPatch = shadersBundle.LoadAsset<Shader>("VF Shaders_Forward_Terrain Reform");
 			shadersBundle.Unload(false);
 
 			for (int i = 0; i < maxPlanetCount; ++i)
-				paintingTexs[i] = new Texture2D(4096, 5088, TextureFormat.RGBA32, false);
+				paintingTexs[i] = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+			tempTex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
 			TextureStorage.textureSaveFolder = Path.Combine(
 				Path.GetDirectoryName(Config.ConfigFilePath),
 				Path.GetFileNameWithoutExtension(Config.ConfigFilePath)
@@ -54,7 +56,7 @@ namespace DSPBasePainter
 			Vector3 localPosition = reform0RectTransform.localPosition;
 			localPosition.x -= 358f;
 			paintRectTransform.localPosition = localPosition;
-			AssetBundle iconBundle = AssetBundle.LoadFromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("DSPBasePainter.icon"));
+			AssetBundle iconBundle = AssetBundle.LoadFromStream(Assembly.GetExecutingAssembly().GetManifestResourceStream("DSPFoundationPainter.icon"));
 			Sprite icon = iconBundle.LoadAsset<Sprite>("icon");
 			iconBundle.Unload(false);
 			paintRectTransform.Find("icon").GetComponent<Image>().sprite = icon;
@@ -124,8 +126,19 @@ namespace DSPBasePainter
 			if (chunkData == null || chunkData.Length != 40700)
 				yield break;
 			PlanetData localPlanet = GameMain.localPlanet;
-			if (!paintingTexs[localPlanet.index].LoadImage(pngBytes))
-				yield break;
+			Material reformMat0 = localPlanet.reformMaterial0;
+			Material reformMat1 = localPlanet.reformMaterial1;
+			if (reformMat0.shader != shaderPatch || reformMat1.shader != shaderPatch)
+			{
+				if (!paintingTexs[localPlanet.index].LoadImage(pngBytes))
+					yield break;
+			}
+			else
+			{
+				// 星球表面有其他地基画，先加载到临时纹理
+				if (!tempTex.LoadImage(pngBytes))
+					yield break;
+			}
 			yield return null;
 			PlayerAction_Build actionBuild = GameMain.mainPlayer.controller.actionBuild;
 			BuildTool_BlueprintPaste buildTool_BlueprintPaste = actionBuild.blueprintPasteTool;
@@ -183,8 +196,6 @@ namespace DSPBasePainter
 			if (!buildTool_BlueprintPaste.DetermineReforms())
 				yield break;
 			yield return null;
-			Material reformMat0 = localPlanet.reformMaterial0;
-			Material reformMat1 = localPlanet.reformMaterial1;
 			if (reformMat0.shader != shaderPatch || reformMat1.shader != shaderPatch)
 			{
 				reformMat0.shader = shaderPatch;
@@ -200,13 +211,21 @@ namespace DSPBasePainter
 					reformMat1.SetBuffer("_OffsetsBuffer", reformOffsetsBuffer);
 					reformMat1.SetBuffer("_DataBuffer", reformDataBuffer);
 				}
+				reformMat0.SetTexture("_PaintingTexture", paintingTexs[localPlanet.index]);
+				reformMat1.SetTexture("_PaintingTexture", paintingTexs[localPlanet.index]);
+				TextureStorage.SaveTexture(localPlanet.id, pngBytes, filePath);
 			}
-			reformMat0.SetTexture("_PaintingTexture", paintingTexs[localPlanet.index]);
-			reformMat1.SetTexture("_PaintingTexture", paintingTexs[localPlanet.index]);
-			//Debug.Log($"receiveShadows : {GameMain.universeSimulator.FindPlanetSimulator(GameMain.localPlanet).reformRenderer.receiveShadows}");//true
-			//Debug.Log($"lightProbeUsage : {GameMain.universeSimulator.FindPlanetSimulator(GameMain.localPlanet).reformRenderer.lightProbeUsage}");//Off
-
-			TextureStorage.SaveTexture(localPlanet.id, filePath, pngBytes);
+			else
+			{
+				Color32[] basePixels = paintingTexs[localPlanet.index].GetPixels32();
+				Color32[] overlayPixels = tempTex.GetPixels32();
+				for (int i = 0; i < basePixels.Length; i++)
+					if (overlayPixels[i].a > 0)
+						basePixels[i] = overlayPixels[i];
+				paintingTexs[localPlanet.index].SetPixels32(basePixels);
+				paintingTexs[localPlanet.index].Apply();
+				TextureStorage.SaveTexture(localPlanet.id, paintingTexs[localPlanet.index].EncodeToPNG());
+			}
 		}
 
 		[HarmonyTranspiler, HarmonyPatch(typeof(BuildTool_BlueprintPaste), nameof(BuildTool_BlueprintPaste.DetermineReforms))]

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace DSPBasePainter
+namespace DSPFoundationPainter
 {
 	// 调用Windows API打开文件对话框
 	internal static class FileDialog

@@ -7,25 +7,21 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Security.Cryptography;
 using UnityEngine;
 
-namespace DSPBasePainter
+namespace DSPFoundationPainter
 {
 	internal static class TextureStorage
 	{
 		// 纹理文件SHA256就是纹理图片文件名
 
-		// 纹理文件SHA256 -> 引用计数
-		private static Dictionary<string, int> textures;
 		// PlanetData.id -> 纹理文件SHA256
 		private static Dictionary<int, string> currentGame;
 		public static string textureSaveFolder;
-		private static bool textureChanged = false;
 
 		public static void Init()
 		{
-			textures = LoadDictionary<string, int>(Path.Combine(textureSaveFolder, "texture_mapping.dat"));
 			currentGame = new Dictionary<int, string>();
 		}
-		public static void SaveTexture(int planetId, string texturePath, byte[] textureBytes)
+		public static void SaveTexture(int planetId, byte[] textureBytes, string texturePath = null)
 		{
 			byte[] hashBytes;
 			using (SHA256 sha256 = SHA256.Create())
@@ -34,22 +30,17 @@ namespace DSPBasePainter
 			}
 			string textureHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
 			currentGame[planetId] = textureHash;
-			if (textures.ContainsKey(textureHash))
-				textures[textureHash]++;
+			Directory.CreateDirectory(Path.Combine(textureSaveFolder, "Texture"));
+			if (texturePath != null)
+				File.Copy(texturePath, Path.Combine(textureSaveFolder, "Texture", Path.ChangeExtension(textureHash, ".png")), true);
 			else
-			{
-				textures[textureHash] = 1;
-				Directory.CreateDirectory(Path.Combine(textureSaveFolder, "Texture"));
-				File.Copy(texturePath, Path.Combine(textureSaveFolder, "Texture", Path.ChangeExtension(textureHash, ".png")));
-			}
-			textureChanged = true;
+				File.WriteAllBytes(Path.Combine(textureSaveFolder, "Texture", Path.ChangeExtension(textureHash, ".png")), textureBytes);
 		}
 		public static void LoadTexture(PlanetData planet)
 		{
 			if (currentGame.TryGetValue(planet.id, out string textureHash))
 			{
 				string texturePath = Path.Combine(textureSaveFolder, "Texture", Path.ChangeExtension(textureHash, ".png"));
-				bool loadFailed = false;
 				if (File.Exists(texturePath))
 				{
 					byte[] pngBytes = File.ReadAllBytes(texturePath);
@@ -62,27 +53,21 @@ namespace DSPBasePainter
 						{
 							reformMat0.shader = Painter.shaderPatch;
 							reformMat1.shader = Painter.shaderPatch;
+							reformMat0.SetTexture("_PaintingTexture", Painter.paintingTexs[planet.index]);
+							reformMat1.SetTexture("_PaintingTexture", Painter.paintingTexs[planet.index]);
 						}
-						reformMat0.SetTexture("_PaintingTexture", Painter.paintingTexs[planet.index]);
-						reformMat1.SetTexture("_PaintingTexture", Painter.paintingTexs[planet.index]);
 					}
 					else
 					{
 						Debug.LogWarning($"Failed to load texture for planet {planet.id} from {texturePath}");
 						File.Delete(texturePath);
-						loadFailed = true;
+						currentGame.Remove(planet.id);
 					}
 				}
 				else
 				{
 					Debug.LogWarning($"Texture file {texturePath} not found for planet {planet.id}");
-					loadFailed = true;
-				}
-				if (loadFailed)
-				{
 					currentGame.Remove(planet.id);
-					textureChanged = true;
-					textures.Remove(textureHash);
 				}
 			}
 		}
@@ -136,11 +121,6 @@ namespace DSPBasePainter
 			else
 				saveName = saveName.ValidFileName();
 			SaveDictionary(currentGame, Path.Combine(textureSaveFolder, "Save", Path.ChangeExtension(saveName, ".dat")));
-			if (textureChanged)
-			{
-				SaveDictionary(textures, Path.Combine(textureSaveFolder, "texture_mapping.dat"));
-				textureChanged = false;
-			}
 		}
 
 		[HarmonyPostfix, HarmonyPatch(typeof(GameSave), nameof(GameSave.AutoSave))]
