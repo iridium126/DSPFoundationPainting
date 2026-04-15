@@ -194,7 +194,10 @@ namespace DSPFoundationPainter
 			}
 			buildTool_BlueprintPaste.result = EBlueprintPasteResult.BuildingNeedReform | (EBlueprintPasteResult)8;
 			if (!buildTool_BlueprintPaste.DetermineReforms())
+			{
+				buildTool_BlueprintPaste.reformGridIds.Clear();
 				yield break;
+			}
 			yield return null;
 			if (reformMat0.shader != shaderPatch || reformMat1.shader != shaderPatch)
 			{

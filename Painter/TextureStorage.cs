@@ -30,11 +30,15 @@ namespace DSPFoundationPainter
 			}
 			string textureHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
 			currentGame[planetId] = textureHash;
-			Directory.CreateDirectory(Path.Combine(textureSaveFolder, "Texture"));
-			if (texturePath != null)
-				File.Copy(texturePath, Path.Combine(textureSaveFolder, "Texture", Path.ChangeExtension(textureHash, ".png")), true);
-			else
-				File.WriteAllBytes(Path.Combine(textureSaveFolder, "Texture", Path.ChangeExtension(textureHash, ".png")), textureBytes);
+			string destPath = Path.Combine(textureSaveFolder, "Texture", Path.ChangeExtension(textureHash, ".png"));
+			if (!File.Exists(destPath))
+			{
+				Directory.CreateDirectory(Path.Combine(textureSaveFolder, "Texture"));
+				if (texturePath != null)
+					File.Copy(texturePath, destPath, true);
+				else
+					File.WriteAllBytes(destPath, textureBytes);
+			}
 		}
 		public static void LoadTexture(PlanetData planet)
 		{
